@@ -3,8 +3,25 @@ import { useQuery, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 
+interface SessionAffirmation {
+  content: string;
+  order: number;
+  subject: string;
+  timeframe?: string;
+  category: string;
+}
+
+interface SessionData {
+  sessionId: number;
+  theme: string;
+  affirmations: SessionAffirmation[];
+}
+
 interface ReviewInterfaceProps {
-  setId: Id<"affirmationSets">;
+  setId?: Id<"affirmationSets">;
+  sessionData?: SessionData;
+  collectionId?: Id<"sessionCollections">;
+  sessionId?: number;
   onBack: () => void;
 }
 
@@ -17,7 +34,7 @@ interface AntiAffirmation {
   errorType: string;
 }
 
-export function ReviewInterface({ setId, onBack }: ReviewInterfaceProps) {
+export function ReviewInterface({ setId, sessionData, collectionId, sessionId, onBack }: ReviewInterfaceProps) {
   const [currentAffirmationIndex, setCurrentAffirmationIndex] = useState(0);
   const [viewMode, setViewMode] = useState<ViewMode>("review");
   const [practiceMode, setPracticeMode] = useState<PracticeMode>("loading");
@@ -27,10 +44,22 @@ export function ReviewInterface({ setId, onBack }: ReviewInterfaceProps) {
   const [score, setScore] = useState({ correct: 0, total: 0 });
   const [showingCorrect, setShowingCorrect] = useState(true);
 
-  const setData = useQuery(api.affirmations.getSetWithAffirmations, { setId });
+  // Conditional data fetching
+  const setData = useQuery(
+    api.affirmations.getSetWithAffirmations,
+    setId ? { setId } : "skip"
+  );
+  const dbSessionData = useQuery(
+    api.affirmations.getSessionForPractice,
+    collectionId && sessionId ? { collectionId, sessionId } : "skip"
+  );
   const generateAntiAffirmations = useAction(api.affirmations.generateAntiAffirmations);
 
-  if (!setData) {
+  // Determine data source
+  const isSessionMode = !!sessionData || !!dbSessionData;
+  const isLoading = !sessionData && !dbSessionData && !setData;
+
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <div className="w-6 h-6 border-2 border-gray-300 border-t-black rounded-full animate-spin"></div>
@@ -38,7 +67,11 @@ export function ReviewInterface({ setId, onBack }: ReviewInterfaceProps) {
     );
   }
 
-  const { set, affirmations } = setData;
+  // Extract data based on mode
+  const currentSessionData = sessionData || dbSessionData;
+  const title = isSessionMode ? `Session ${currentSessionData?.sessionId}: ${currentSessionData?.theme}` : setData?.set.title || "";
+  const sourceContent = isSessionMode ? null : setData?.set.sourceContent;
+  const affirmations = isSessionMode ? currentSessionData?.affirmations || [] : setData?.affirmations || [];
   const currentAffirmation = affirmations[currentAffirmationIndex];
 
   const handleNext = () => {
@@ -293,8 +326,10 @@ export function ReviewInterface({ setId, onBack }: ReviewInterfaceProps) {
         </button>
         <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-2xl font-light text-gray-900 mb-1">{set.title}</h2>
-            <p className="text-gray-600">Review your affirmations</p>
+            <h2 className="text-2xl font-light text-gray-900 mb-1">{title}</h2>
+            <p className="text-gray-600">
+              {isSessionMode ? "Review this themed session" : "Review your affirmations"}
+            </p>
           </div>
           <div className="flex items-center gap-4">
             <button
@@ -364,17 +399,49 @@ export function ReviewInterface({ setId, onBack }: ReviewInterfaceProps) {
         </button>
       </div>
 
-      {/* Source Content */}
-      {set.sourceContent && (
-        <div className="mt-12 bg-gray-50 rounded-lg p-6">
-          <h3 className="text-sm font-medium text-gray-900 mb-3">Source Content</h3>
-          <p className="text-sm text-gray-600 leading-relaxed">
-            {set.sourceContent.length > 500 
-              ? `${set.sourceContent.substring(0, 500)}...` 
-              : set.sourceContent
-            }
-          </p>
+      {/* Source Content or Session Info */}
+      {isSessionMode ? (
+        <div className="mt-12 bg-blue-50 rounded-lg p-6">
+          <h3 className="text-sm font-medium text-blue-900 mb-3">Session Information</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <h4 className="text-xs font-medium text-blue-700 mb-1">Session Theme</h4>
+              <p className="text-sm text-blue-800">{currentSessionData?.theme}</p>
+            </div>
+            <div>
+              <h4 className="text-xs font-medium text-blue-700 mb-1">Main Subjects</h4>
+              <div className="flex flex-wrap gap-1">
+                {Array.from(new Set(currentSessionData?.affirmations.map(a => a.subject) || [])).map(subject => (
+                  <span key={subject} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                    {subject}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div>
+              <h4 className="text-xs font-medium text-blue-700 mb-1">Categories</h4>
+              <div className="flex flex-wrap gap-1">
+                {Array.from(new Set(currentSessionData?.affirmations.map(a => a.category) || [])).map(category => (
+                  <span key={category} className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                    {category}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
+      ) : (
+        sourceContent && (
+          <div className="mt-12 bg-gray-50 rounded-lg p-6">
+            <h3 className="text-sm font-medium text-gray-900 mb-3">Source Content</h3>
+            <p className="text-sm text-gray-600 leading-relaxed">
+              {sourceContent.length > 500
+                ? `${sourceContent.substring(0, 500)}...`
+                : sourceContent
+              }
+            </p>
+          </div>
+        )
       )}
     </div>
   );

@@ -5,11 +5,28 @@ import { Id } from "../../convex/_generated/dataModel";
 import { CreateSet } from "./CreateSet";
 import { ReviewInterface } from "./ReviewInterface";
 import { AffirmationSetList } from "./AffirmationSetList";
+import { CreateSessions } from "./CreateSessions";
+import { SessionsList } from "./SessionsList";
+import { SessionCollectionsList } from "./SessionCollectionsList";
+
+interface SessionData {
+  sessionId: number;
+  theme: string;
+  affirmations: Array<{
+    content: string;
+    order: number;
+    subject: string;
+    timeframe?: string;
+    category: string;
+  }>;
+}
 
 
 export function Dashboard() {
-  const [currentView, setCurrentView] = useState<"home" | "create" | "review">("home");
+  const [currentView, setCurrentView] = useState<"home" | "create" | "review" | "sessions" | "sessions-list" | "collections">("home");
   const [selectedSetId, setSelectedSetId] = useState<Id<"affirmationSets"> | null>(null);
+  const [selectedCollectionId, setSelectedCollectionId] = useState<Id<"sessionCollections"> | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
 
   const sets = useQuery(api.affirmations.getUserSets) || [];
 
@@ -24,25 +41,74 @@ export function Dashboard() {
 
   if (currentView === "create") {
     return (
-      <CreateSet 
+      <CreateSet
         onBack={() => setCurrentView("home")}
         onComplete={() => setCurrentView("home")}
       />
     );
   }
 
-
-
-  if (currentView === "review" && selectedSetId) {
+  if (currentView === "sessions") {
     return (
-      <ReviewInterface
-        setId={selectedSetId}
-        onBack={() => {
-          setCurrentView("home");
-          setSelectedSetId(null);
+      <CreateSessions
+        onBack={() => setCurrentView("home")}
+        onComplete={(collectionId) => {
+          setSelectedCollectionId(collectionId);
+          setCurrentView("sessions-list");
         }}
       />
     );
+  }
+
+  if (currentView === "collections") {
+    return (
+      <SessionCollectionsList
+        onBack={() => setCurrentView("home")}
+        onSelectCollection={(collectionId) => {
+          setSelectedCollectionId(collectionId);
+          setCurrentView("sessions-list");
+        }}
+      />
+    );
+  }
+
+  if (currentView === "sessions-list" && selectedCollectionId) {
+    return (
+      <SessionsList
+        collectionId={selectedCollectionId}
+        onBack={() => setCurrentView("collections")}
+        onSelectSession={(collectionId, sessionId) => {
+          setSelectedCollectionId(collectionId);
+          setSelectedSessionId(sessionId);
+          setCurrentView("review");
+        }}
+      />
+    );
+  }
+
+  if (currentView === "review") {
+    if (selectedCollectionId && selectedSessionId) {
+      return (
+        <ReviewInterface
+          collectionId={selectedCollectionId}
+          sessionId={selectedSessionId}
+          onBack={() => {
+            setCurrentView("sessions-list");
+            setSelectedSessionId(null);
+          }}
+        />
+      );
+    } else if (selectedSetId) {
+      return (
+        <ReviewInterface
+          setId={selectedSetId}
+          onBack={() => {
+            setCurrentView("home");
+            setSelectedSetId(null);
+          }}
+        />
+      );
+    }
   }
 
   return (
@@ -61,7 +127,33 @@ export function Dashboard() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 max-w-6xl mx-auto">
+        <button
+          onClick={() => setCurrentView("sessions")}
+          className="group p-8 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg hover:border-blue-300 transition-all duration-200 text-left"
+        >
+          <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4 group-hover:bg-blue-200 transition-colors">
+            <span className="text-xl">🧠</span>
+          </div>
+          <h3 className="text-lg font-medium text-blue-900 mb-2">Generate Sessions</h3>
+          <p className="text-blue-700 text-sm">
+            Analyze extensive content to create multiple themed learning sessions
+          </p>
+        </button>
+
+        <button
+          onClick={() => setCurrentView("collections")}
+          className="group p-8 bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-lg hover:border-green-300 transition-all duration-200 text-left"
+        >
+          <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4 group-hover:bg-green-200 transition-colors">
+            <span className="text-xl">📚</span>
+          </div>
+          <h3 className="text-lg font-medium text-green-900 mb-2">Browse Collections</h3>
+          <p className="text-green-700 text-sm">
+            View and practice your saved session collections
+          </p>
+        </button>
+
         <button
           onClick={() => setCurrentView("create")}
           className="group p-8 bg-white border border-gray-200 rounded-lg hover:border-gray-300 transition-all duration-200 text-left"
@@ -71,7 +163,7 @@ export function Dashboard() {
           </div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">Create Affirmations</h3>
           <p className="text-gray-600 text-sm">
-            Upload documents or paste text to generate AI-powered affirmations
+            Generate a single set of 3 AI-powered affirmations
           </p>
         </button>
 

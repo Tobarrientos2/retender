@@ -19,6 +19,37 @@ const applicationTables = {
   }).index("by_set", ["setId"])
     .index("by_user", ["userId"]),
 
+  // Sessions Intelligence System
+  sessionCollections: defineTable({
+    userId: v.id("users"),
+    title: v.string(),
+    sourceContent: v.string(),
+    totalAffirmations: v.number(),
+    totalSessions: v.number(),
+    contentType: v.string(), // "general" | "programming"
+  }).index("by_user", ["userId"]),
+
+  sessions: defineTable({
+    collectionId: v.id("sessionCollections"),
+    userId: v.id("users"),
+    sessionId: v.number(), // 1, 2, 3, etc.
+    theme: v.string(),
+  }).index("by_collection", ["collectionId"])
+    .index("by_user", ["userId"]),
+
+  sessionAffirmations: defineTable({
+    sessionId: v.id("sessions"),
+    collectionId: v.id("sessionCollections"),
+    userId: v.id("users"),
+    content: v.string(),
+    order: v.number(), // 1, 2, 3
+    subject: v.string(),
+    timeframe: v.optional(v.string()),
+    category: v.string(),
+  }).index("by_session", ["sessionId"])
+    .index("by_collection", ["collectionId"])
+    .index("by_user", ["userId"]),
+
   studySessions: defineTable({
     userId: v.id("users"),
     setId: v.id("flashcardSets"),

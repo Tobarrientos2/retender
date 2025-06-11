@@ -3,6 +3,21 @@ import { query, mutation, action, internalMutation } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
 
+interface SessionsResponse {
+  totalAffirmations: number;
+  sessions: Array<{
+    sessionId: number;
+    theme: string;
+    affirmations: Array<{
+      content: string;
+      order: number;
+      subject: string;
+      timeframe?: string;
+      category: string;
+    }>;
+  }>;
+}
+
 export const getUserSets = query({
   args: {},
   handler: async (ctx) => {
@@ -91,6 +106,38 @@ export const generateAntiAffirmations = action({
   },
 });
 
+export const generateSessions = action({
+  args: {
+    content: v.string(),
+    title: v.optional(v.string()),
+  },
+  handler: async (ctx, args): Promise<{ collectionId: string; sessions: SessionsResponse }> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    // Generate sessions using AI
+    const sessionsData: SessionsResponse = await ctx.runAction(internal.ai.generateSessions, {
+      content: args.content,
+    });
+
+    // Save to database using mutation
+    const collectionId = await ctx.runMutation(internal.affirmations.createSessionCollection, {
+      userId,
+      title: args.title || `Sessions from ${new Date().toLocaleDateString()}`,
+      sourceContent: args.content,
+      totalAffirmations: sessionsData.totalAffirmations,
+      totalSessions: sessionsData.sessions.length,
+      contentType: "general", // TODO: detect from AI response
+      sessionsData,
+    });
+
+    return {
+      collectionId,
+      sessions: sessionsData,
+    };
+  },
+});
+
 export const analyzeImage = action({
   args: {
     imageBase64: v.string(),
@@ -154,5 +201,161 @@ export const createAffirmation = internalMutation({
       content: args.content,
       order: args.order,
     });
+  },
+});
+
+// Session Collection Management
+export const createSessionCollection = internalMutation({
+  args: {
+    userId: v.id("users"),
+    title: v.string(),
+    sourceContent: v.string(),
+    totalAffirmations: v.number(),
+    totalSessions: v.number(),
+    contentType: v.string(),
+    sessionsData: v.any(),
+  },
+  handler: async (ctx, args) => {
+    // Create the collection
+    const collectionId = await ctx.db.insert("sessionCollections", {
+      userId: args.userId,
+      title: args.title,
+      sourceContent: args.sourceContent,
+      totalAffirmations: args.totalAffirmations,
+      totalSessions: args.totalSessions,
+      contentType: args.contentType,
+    });
+
+    // Create individual sessions and their affirmations
+    for (const sessionData of args.sessionsData.sessions) {
+      const sessionId = await ctx.db.insert("sessions", {
+        collectionId,
+        userId: args.userId,
+        sessionId: sessionData.sessionId,
+        theme: sessionData.theme,
+      });
+
+      // Create affirmations for this session
+      for (const affirmation of sessionData.affirmations) {
+        await ctx.db.insert("sessionAffirmations", {
+          sessionId,
+          collectionId,
+          userId: args.userId,
+          content: affirmation.content,
+          order: affirmation.order,
+          subject: affirmation.subject,
+          timeframe: affirmation.timeframe,
+          category: affirmation.category,
+        });
+      }
+    }
+
+    return collectionId;
+  },
+});
+
+// Query Functions for Sessions
+export const getSessionCollections = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    return await ctx.db
+      .query("sessionCollections")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .order("desc")
+      .collect();
+  },
+});
+
+export const getSessionCollection = query({
+  args: { collectionId: v.id("sessionCollections") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const collection = await ctx.db.get(args.collectionId);
+    if (!collection || collection.userId !== userId) {
+      throw new Error("Collection not found");
+    }
+
+    // Get all sessions for this collection
+    const sessions = await ctx.db
+      .query("sessions")
+      .withIndex("by_collection", (q) => q.eq("collectionId", args.collectionId))
+      .collect();
+
+    // Get affirmations for each session
+    const sessionsWithAffirmations = await Promise.all(
+      sessions.map(async (session) => {
+        const affirmations = await ctx.db
+          .query("sessionAffirmations")
+          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+          .collect();
+
+        return {
+          sessionId: session.sessionId,
+          theme: session.theme,
+          affirmations: affirmations
+            .sort((a, b) => a.order - b.order)
+            .map((aff) => ({
+              content: aff.content,
+              order: aff.order,
+              subject: aff.subject,
+              timeframe: aff.timeframe,
+              category: aff.category,
+            })),
+        };
+      })
+    );
+
+    return {
+      collection,
+      sessions: sessionsWithAffirmations.sort((a, b) => a.sessionId - b.sessionId),
+      totalAffirmations: collection.totalAffirmations,
+    };
+  },
+});
+
+export const getSessionForPractice = query({
+  args: {
+    collectionId: v.id("sessionCollections"),
+    sessionId: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    // Get the session
+    const session = await ctx.db
+      .query("sessions")
+      .withIndex("by_collection", (q) => q.eq("collectionId", args.collectionId))
+      .filter((q) => q.eq(q.field("sessionId"), args.sessionId))
+      .first();
+
+    if (!session || session.userId !== userId) {
+      throw new Error("Session not found");
+    }
+
+    // Get affirmations for this session
+    const affirmations = await ctx.db
+      .query("sessionAffirmations")
+      .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+      .collect();
+
+    return {
+      sessionId: session.sessionId,
+      theme: session.theme,
+      affirmations: affirmations
+        .sort((a, b) => a.order - b.order)
+        .map((aff) => ({
+          content: aff.content,
+          order: aff.order,
+          subject: aff.subject,
+          timeframe: aff.timeframe,
+          category: aff.category,
+        })),
+    };
   },
 });

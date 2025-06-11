@@ -436,6 +436,177 @@ Only return the JSON array, no other text.`;
   },
 });
 
+export const generateSessions = internalAction({
+  args: {
+    content: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY environment variable is required");
+    }
+
+    const prompt = `
+You are an advanced content analyzer that extracts multiple affirmations from text and intelligently groups them into coherent sessions.
+
+TASK: Analyze the following content and create multiple sessions, each containing exactly 3 related affirmations.
+
+Content to analyze:
+${args.content}
+
+INSTRUCTIONS:
+1. EXTRACT MULTIPLE AFFIRMATIONS: Find all possible factual statements, concepts, dates, events, processes, etc.
+2. ANALYZE RELATIONSHIPS: Group affirmations by:
+   - Subject/Topic (same person, place, concept)
+   - Temporal relationships (same time period, sequential events)
+   - Causal relationships (cause and effect)
+   - Thematic connections (same domain, related concepts)
+   - Grammatical subjects (same entities being discussed)
+
+3. CREATE SESSIONS: Group exactly 3 related affirmations per session
+4. ENSURE COHERENCE: Each session should tell a "mini-story" or explore a specific aspect
+5. MAXIMIZE COVERAGE: Extract as many meaningful affirmations as possible from the content
+
+EXAMPLES of good session grouping:
+
+SESSION 1 (Temporal sequence):
+- "The bicycle was invented in 1817 by Baron von Drais"
+- "The first commercial bicycle was sold in 1819 in London"
+- "By 1825, bicycle manufacturing had spread across Europe"
+
+SESSION 2 (Same subject - technical aspects):
+- "Early bicycles had wooden wheels without pedals"
+- "The pedal mechanism was added to bicycles in 1861"
+- "Pneumatic tires revolutionized bicycle comfort in 1888"
+
+SESSION 3 (Same subject - social impact):
+- "Bicycles provided new mobility for working-class people"
+- "The bicycle industry created thousands of manufacturing jobs"
+- "Cycling became a popular recreational activity by 1890"
+
+RESPONSE FORMAT:
+Return a JSON object with this exact structure:
+{
+  "totalAffirmations": number,
+  "sessions": [
+    {
+      "sessionId": 1,
+      "theme": "Brief description of the session theme",
+      "affirmations": [
+        {
+          "content": "First affirmation (max 15 words)",
+          "order": 1,
+          "subject": "Main grammatical subject",
+          "timeframe": "Time period if applicable",
+          "category": "Type of information (fact/event/process/concept)"
+        },
+        {
+          "content": "Second affirmation (max 15 words)",
+          "order": 2,
+          "subject": "Main grammatical subject",
+          "timeframe": "Time period if applicable",
+          "category": "Type of information"
+        },
+        {
+          "content": "Third affirmation (max 15 words)",
+          "order": 3,
+          "subject": "Main grammatical subject",
+          "timeframe": "Time period if applicable",
+          "category": "Type of information"
+        }
+      ]
+    }
+  ]
+}
+
+REQUIREMENTS:
+- Each affirmation must be maximum 15 words
+- Extract as many sessions as possible from the content
+- Ensure each session has thematic coherence
+- Use SPECIFIC details from the provided content
+- Include subject, timeframe, and category analysis
+- Write in OBJECTIVE, THIRD-PERSON language
+
+Only return the JSON object, no other text.`;
+
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text: prompt,
+                  },
+                ],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.7,
+              topK: 40,
+              topP: 0.95,
+              maxOutputTokens: 8192,
+            },
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Gemini API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!text) {
+        throw new Error("No response from Gemini API");
+      }
+
+      // Extract JSON from the response
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error("Could not extract JSON from response");
+      }
+
+      const sessions = JSON.parse(jsonMatch[0]);
+
+      // Validate the structure
+      if (!sessions.sessions || !Array.isArray(sessions.sessions)) {
+        throw new Error("Invalid sessions structure");
+      }
+
+      for (const session of sessions.sessions) {
+        if (!session.affirmations || !Array.isArray(session.affirmations) ||
+            session.affirmations.length !== 3) {
+          throw new Error("Each session must have exactly 3 affirmations");
+        }
+
+        for (const affirmation of session.affirmations) {
+          if (!affirmation.content || !affirmation.order || !affirmation.subject ||
+              typeof affirmation.content !== 'string' ||
+              typeof affirmation.order !== 'number' ||
+              typeof affirmation.subject !== 'string' ||
+              affirmation.order < 1 || affirmation.order > 3) {
+            throw new Error("Invalid affirmation structure in session");
+          }
+        }
+      }
+
+      return sessions;
+    } catch (error) {
+      console.error("Error generating sessions:", error);
+      const message = error instanceof Error ? error.message : "Unknown error";
+      throw new Error(`Failed to generate sessions: ${message}`);
+    }
+  },
+});
+
 export const analyzeImage = internalAction({
   args: {
     imageBase64: v.string(),

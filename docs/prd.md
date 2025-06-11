@@ -1,10 +1,10 @@
-# Product Requirements Document (PRD) - Retender
+# Product Requirements Document (PRD) - Retender: Sistema de Sesiones Inteligentes
 
 ## 🎯 OBJETIVO GENERAL
-Transformar completamente la aplicación de "Kioku" a "Retender", cambiando de un sistema de flashcards con spaced repetition a un sistema innovador de afirmaciones generadas por IA, donde cada set contiene exactamente 3 afirmaciones poderosas sobre el contenido analizado.
+Implementar el **Sistema de Sesiones Inteligentes** en Retender, transformando la aplicación de un generador de sets únicos de 3 afirmaciones a una plataforma completa de aprendizaje estructurado que extrae múltiples sesiones temáticas de contenido extenso, maximizando el valor educativo de cualquier material proporcionado.
 
 ## 🏗️ ARQUITECTURA TARGET
-La aplicación mantiene su arquitectura técnica actual pero con branding completamente actualizado:
+Sistema de Sesiones Inteligentes con backend ya implementado y frontend a desarrollar:
 
 ```mermaid
 graph TB
@@ -12,13 +12,18 @@ graph TB
     A --> C[Tailwind CSS Styling]
     A --> D[Convex Backend]
     D --> E[Authentication System]
-    D --> F[Flashcard Database]
-    D --> G[AI Processing - Gemini]
-    
-    H[Retender Brand Identity] --> A
-    H --> I[HTML Metadata]
-    H --> J[Package Configuration]
-    H --> K[Documentation]
+    D --> F[Affirmations Database ✅]
+    D --> G[AI Processing - Gemini ✅]
+    D --> H[Sessions Generator ✅]
+
+    I[Sessions Frontend ❌] --> A
+    I --> J[CreateSessions Component ❌]
+    I --> K[SessionsList Component ❌]
+    I --> L[SessionsNavigation ❌]
+
+    M[Backend APIs ✅] --> N[generateSessions ✅]
+    M --> O[generateAffirmations ✅]
+    M --> P[generateAntiAffirmations ✅]
 ```
 
 ## ✅ SUCCESS CRITERIA
@@ -30,6 +35,10 @@ graph TB
 - ✅ Modo de práctica interactivo con scoring
 - ✅ Feedback inmediato y explicaciones de errores
 - ✅ Interface gamificada y engaging
+- ✅ **Backend de Sesiones Inteligentes completamente implementado**
+- ❌ **Frontend de Sesiones Inteligentes (PENDIENTE)**
+- ❌ **Navegación entre múltiples sesiones (PENDIENTE)**
+- ❌ **Interface para generar sesiones masivas (PENDIENTE)**
 
 ### Técnicos:
 - ✅ IA especializada con Gemini API funcionando al 100%
@@ -38,8 +47,12 @@ graph TB
 - ✅ Sistema de autenticación seguro
 - ✅ Testing completo con casos reales validados
 - ✅ Arquitectura escalable y mantenible
+- ✅ **Análisis semántico avanzado implementado**
+- ✅ **Agrupación inteligente por relaciones temáticas**
+- ✅ **Endpoint generateSessions funcional**
+- ❌ **Componentes React para sesiones (PENDIENTE)**
 
-## 🎯 SCOPE MVP
+## 🎯 SCOPE MVP - SISTEMA DE SESIONES INTELIGENTES
 ### INCLUIDO EN MVP:
 - ✅ Sistema completo de afirmaciones (3 por set)
 - ✅ IA que genera afirmaciones declarativas
@@ -49,6 +62,11 @@ graph TB
 - ✅ Eliminación de funcionalidad de screen recording
 - ✅ Rebranding completo a "Retender"
 - ✅ UI adaptada al nuevo concepto
+- ✅ **Backend de Sesiones Inteligentes completo**
+- ❌ **CreateSessions Component (CRÍTICO)**
+- ❌ **SessionsList Component (CRÍTICO)**
+- ❌ **SessionsNavigation Component (CRÍTICO)**
+- ❌ **Integración con Dashboard existente (CRÍTICO)**
 
 ### EXCLUIDO DEL MVP:
 - Logo profesional personalizado
@@ -56,6 +74,8 @@ graph TB
 - Funcionalidades de colaboración
 - Exportación de afirmaciones
 - Categorización avanzada
+- Persistencia de sesiones en base de datos (usar solo en memoria)
+- Edición manual de sesiones generadas
 
 ## 🔧 ESPECIFICACIONES TÉCNICAS
 ### Frontend Specifications:
@@ -82,29 +102,43 @@ graph TB
 
 ## 📊 DIAGRAMAS DE ARQUITECTURA
 
-### Flujo de Branding Actualizado:
+### Flujo del Sistema de Sesiones Inteligentes:
 ```mermaid
-flowchart LR
-    A[Usuario accede] --> B[index.html - Título: Retender]
-    B --> C[App.tsx - Header con Retender]
-    C --> D[Ícono R + Texto Retender]
-    D --> E[Experiencia de usuario consistente]
-    
-    F[SEO/Social] --> G[Open Graph: Retender]
-    G --> H[Twitter Cards: Retender]
-    H --> I[Descripción: AI Flashcard App]
+flowchart TD
+    A[Usuario ingresa texto extenso] --> B[CreateSessions Component]
+    B --> C[generateSessions API ✅]
+    C --> D[Gemini AI Analysis ✅]
+    D --> E[Análisis Semántico ✅]
+    E --> F[Agrupación Inteligente ✅]
+    F --> G[Múltiples Sesiones Generadas ✅]
+    G --> H[SessionsList Component ❌]
+    H --> I[Usuario selecciona sesión]
+    I --> J[ReviewInterface existente ✅]
+
+    K[Criterios de Agrupación ✅] --> E
+    K --> L[Temporal: Cronología]
+    K --> M[Temático: Mismo dominio]
+    K --> N[Causal: Causa-efecto]
+    K --> O[Entidad: Mismo sujeto]
 ```
 
-### Estructura de Archivos Modificados:
+### Arquitectura de Componentes Frontend:
 ```mermaid
 graph TD
-    A[Retender App] --> B[src/App.tsx ✅]
-    A --> C[index.html ✅]
-    A --> D[package.json ✅]
-    A --> E[README.md ✅]
-    A --> F[docs/ - Nuevos]
-    
-    F --> G[prd.md]
-    F --> H[tasks.md]
-    F --> I[execution-plan.md]
+    A[Dashboard ✅] --> B[CreateSessions ❌]
+    A --> C[SessionsList ❌]
+    A --> D[CreateSet ✅]
+    A --> E[ReviewInterface ✅]
+
+    B --> F[Text Input Area]
+    B --> G[Generate Sessions Button]
+    B --> H[Progress Indicator]
+
+    C --> I[Sessions Grid]
+    C --> J[Session Theme Cards]
+    C --> K[Affirmations Preview]
+
+    L[Backend APIs ✅] --> M[generateSessions ✅]
+    L --> N[generateAffirmations ✅]
+    L --> O[generateAntiAffirmations ✅]
 ```

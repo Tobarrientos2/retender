@@ -1,8 +1,104 @@
-# Task Breakdown Structure - Retender Rebranding
+# Task Breakdown Structure - Sistema de Sesiones Inteligentes
 
-## 🔴 TAREAS P0 (CRÍTICAS - COMPLETADAS ✅)
+## 🔴 TAREAS P0 (CRÍTICAS - SISTEMA DE SESIONES INTELIGENTES) - ✅ COMPLETADAS
 
-### 📋 TAREA P0.1 - Actualización de UI Principal
+### 📋 TAREA P0.1 - Componente CreateSessions ✅
+**🎯 OBJETIVO**: Crear interfaz para generar múltiples sesiones de afirmaciones desde texto extenso
+**🔗 DEPENDENCIAS**: React 19, TypeScript, Convex hooks, generateSessions API (✅ ya implementado)
+**⏱️ ESTIMACIÓN**: Alta ✅ COMPLETADA
+
+#### SUBTAREAS:
+##### P0.1.1 - Crear CreateSessions.tsx ✅
+- 🔍 **Análisis Técnico**: Componente React con textarea para input masivo, botón de generación, estado de loading ✅
+- 📊 **Diagrama**: ✅ Implementado
+- 🛠️ **Implementación MVP**: ✅ COMPLETADA
+  - ✅ Textarea para contenido extenso (500+ caracteres mínimo)
+  - ✅ Botón "Generate Sessions" con loading state
+  - ✅ Llamada a generateSessions API con useAction
+  - ✅ Manejo de errores y validación con toast notifications
+  - ✅ Navegación a SessionsList al completar
+  - ✅ Contador de caracteres y palabras en tiempo real
+  - ✅ Secciones de ayuda y ejemplos
+- 🧪 **Pruebas de Integración**: ✅ Verificado con contenido de 2718 caracteres
+- 🔗 **Integraciones**: ✅ useAction para generateSessions, navegación con props
+- ⚡ **Performance**: ✅ Loading states, validación de input
+
+##### P0.1.2 - Integrar con Dashboard ✅
+- 🔍 **Análisis Técnico**: Agregar nueva vista "sessions" al Dashboard existente ✅
+- 🛠️ **Implementación MVP**: ✅ COMPLETADA
+  - ✅ Nuevo estado currentView: "sessions" y "sessions-list"
+  - ✅ Botón "Generate Sessions" en Quick Actions (azul, destacado)
+  - ✅ Navegación bidireccional completa
+  - ✅ Grid de 3 columnas en lugar de 2
+- 🧪 **Pruebas de Integración**: ✅ Verificado navegación completa entre vistas
+- 🔗 **Integraciones**: ✅ Estado de Dashboard, props de navegación, sessionsData state
+
+### 📋 TAREA P0.2 - Componente SessionsList
+**🎯 OBJETIVO**: Mostrar múltiples sesiones generadas con navegación y preview
+**🔗 DEPENDENCIAS**: React 19, TypeScript, sessions data structure
+**⏱️ ESTIMACIÓN**: Alta
+
+#### SUBTAREAS:
+##### P0.2.1 - Crear SessionsList.tsx
+- 🔍 **Análisis Técnico**: Grid de sesiones con tema, preview de afirmaciones, botones de acción
+- 📊 **Diagrama**:
+```mermaid
+graph TD
+A[SessionsList] --> B[Sessions Grid]
+B --> C[Session Card 1] --> D[Theme Title]
+C --> E[Affirmations Preview]
+C --> F[Practice Button]
+B --> G[Session Card 2]
+B --> H[Session Card N]
+```
+- 🛠️ **Implementación MVP**:
+  - Grid responsive de session cards
+  - Preview de 3 afirmaciones por sesión
+  - Tema/título descriptivo por sesión
+  - Botón "Practice Session" por card
+  - Navegación a ReviewInterface con sesión específica
+- 🧪 **Pruebas de Integración**: Verificar con múltiples sesiones (3-6 sesiones)
+- 🔗 **Integraciones**: Props de sessions data, callback para selección
+- ⚡ **Performance**: Virtualización si >10 sesiones
+
+##### P0.2.2 - Adaptar ReviewInterface para Sesiones
+- 🔍 **Análisis Técnico**: Modificar ReviewInterface para aceptar sessions data en lugar de setId
+- 🛠️ **Implementación MVP**:
+  - Props opcional: sessionData vs setId
+  - Lógica condicional para data source
+  - Mantener funcionalidad existente de anti-afirmaciones
+- 🧪 **Pruebas de Integración**: Verificar modo práctica con sessions vs sets
+- 🔗 **Integraciones**: Backward compatibility con sets existentes
+
+### 📋 TAREA P0.3 - Integración Completa del Sistema
+**🎯 OBJETIVO**: Conectar todos los componentes en flujo completo funcional
+**🔗 DEPENDENCIAS**: CreateSessions, SessionsList, Dashboard, ReviewInterface
+**⏱️ ESTIMACIÓN**: Media
+
+#### SUBTAREAS:
+##### P0.3.1 - Flujo de Navegación Completo
+- 🔍 **Análisis Técnico**: Estado global de navegación entre vistas y data passing
+- 🛠️ **Implementación MVP**:
+  - Dashboard → CreateSessions → SessionsList → ReviewInterface
+  - Estado compartido para sessions data
+  - Navegación "Back" en cada nivel
+  - Breadcrumbs o indicador de posición
+- 🧪 **Pruebas de Integración**: Flujo completo end-to-end con contenido real
+- 🔗 **Integraciones**: Props drilling o Context API para estado compartido
+
+##### P0.3.2 - Manejo de Estados y Errores
+- 🔍 **Análisis Técnico**: Loading states, error handling, empty states
+- 🛠️ **Implementación MVP**:
+  - Loading spinners en generación de sesiones
+  - Error messages con retry functionality
+  - Empty states cuando no hay sesiones
+  - Validación de input mínimo (500+ caracteres)
+- 🧪 **Pruebas de Integración**: Casos edge: texto muy corto, API errors, timeout
+- 🔗 **Integraciones**: Toast notifications (Sonner), error boundaries
+
+## 🔴 TAREAS P0 ANTERIORES (COMPLETADAS ✅)
+
+### 📋 TAREA P0.4 - Actualización de UI Principal (COMPLETADA ✅)
 **🎯 OBJETIVO**: Cambiar el nombre visible "Kioku" por "Retender" en la interfaz principal
 **🔗 DEPENDENCIAS**: React, TypeScript, Tailwind CSS
 **⏱️ ESTIMACIÓN**: Baja ✅ COMPLETADA
@@ -26,7 +122,7 @@ A --> E[Auth Button]
 - 🛠️ **Implementación MVP**: Cambio a letra "R" como placeholder
 - 🧪 **Pruebas de Integración**: Verificar que ícono se muestra correctamente
 
-### 📋 TAREA P0.2 - Metadatos HTML y SEO
+### 📋 TAREA P0.5 - Metadatos HTML y SEO (COMPLETADA ✅)
 **🎯 OBJETIVO**: Actualizar título y metadatos para SEO y redes sociales
 **🔗 DEPENDENCIAS**: HTML5, Open Graph, Twitter Cards
 **⏱️ ESTIMACIÓN**: Baja ✅ COMPLETADA
@@ -50,7 +146,7 @@ A --> E[Auth Button]
 - 🛠️ **Implementación MVP**: twitter:card, twitter:title, twitter:description
 - 🧪 **Pruebas de Integración**: Verificar preview en Twitter
 
-### 📋 TAREA P0.3 - Configuración del Proyecto
+### 📋 TAREA P0.6 - Configuración del Proyecto (COMPLETADA ✅)
 **🎯 OBJETIVO**: Actualizar configuraciones y documentación del proyecto
 **🔗 DEPENDENCIAS**: npm, package.json, markdown
 **⏱️ ESTIMACIÓN**: Baja ✅ COMPLETADA
@@ -67,9 +163,7 @@ A --> E[Auth Button]
 - 🛠️ **Implementación MVP**: "# Retender - AI Flashcard App"
 - 🧪 **Pruebas de Integración**: Verificar que documentación es clara
 
-## 🔴 TAREAS P0.4 (CRÍTICAS - COMPLETADAS ✅)
-
-### 📋 TAREA P0.4 - Eliminación de Funcionalidad de Grabación de Pantalla
+### 📋 TAREA P0.7 - Eliminación de Funcionalidad de Grabación de Pantalla (COMPLETADA ✅)
 **🎯 OBJETIVO**: Remover completamente la funcionalidad de screen recording/grabación de pantalla
 **🔗 DEPENDENCIAS**: React components, Convex backend, database schema
 **⏱️ ESTIMACIÓN**: Media ✅ COMPLETADA
