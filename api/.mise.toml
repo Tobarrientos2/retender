@@ -1,0 +1,33 @@
+[tools]
+python = "3.11"
+
+[env]
+# Variables de entorno para la API
+PYTHONPATH = "."
+UV_HTTP_TIMEOUT = "600"
+
+# Configuración para usar modelo local únicamente
+USE_OPENAI_API = "false"
+MODEL_SIZE = "base"
+DEVICE = "cpu"
+COMPUTE_TYPE = "int8"
+
+[tasks.install]
+description = "Instalar dependencias usando pip"
+run = "pip install -r requirements.txt"
+
+[tasks.dev]
+description = "Ejecutar servidor de desarrollo"
+run = "python main.py"
+
+[tasks.prod]
+description = "Ejecutar servidor de producción"
+run = "uvicorn main:app --host 0.0.0.0 --port 8000"
+
+[tasks.test]
+description = "Ejecutar tests"
+run = "python -m pytest tests/ -v"
+
+[tasks.models]
+description = "Ver modelos disponibles"
+run = "curl -X GET http://localhost:8001/models"

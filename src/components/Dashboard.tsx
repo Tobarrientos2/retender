@@ -8,6 +8,7 @@ import { AffirmationSetList } from "./AffirmationSetList";
 import { CreateSessions } from "./CreateSessions";
 import { SessionsList } from "./SessionsList";
 import { SessionCollectionsList } from "./SessionCollectionsList";
+import { RecordScreen } from "./RecordScreen";
 
 interface SessionData {
   sessionId: number;
@@ -21,9 +22,16 @@ interface SessionData {
   }>;
 }
 
-
 export function Dashboard() {
-  const [currentView, setCurrentView] = useState<"home" | "create" | "review" | "sessions" | "sessions-list" | "collections">("home");
+  const [currentView, setCurrentView] = useState<
+    | "home"
+    | "create"
+    | "review"
+    | "sessions"
+    | "sessions-list"
+    | "collections"
+    | "record-screen"
+  >("home");
   const [selectedSetId, setSelectedSetId] = useState<Id<"affirmationSets"> | null>(null);
   const [selectedCollectionId, setSelectedCollectionId] = useState<Id<"sessionCollections"> | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
@@ -111,6 +119,12 @@ export function Dashboard() {
     }
   }
 
+  if (currentView === "record-screen") {
+    return (
+      <RecordScreen onBack={() => setCurrentView("home")} />
+    );
+  }
+
   return (
     <div className="space-y-12">
       {/* Header */}
@@ -127,7 +141,7 @@ export function Dashboard() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 max-w-6xl mx-auto">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 max-w-6xl mx-auto">
         <button
           onClick={() => setCurrentView("sessions")}
           className="group p-8 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg hover:border-blue-300 transition-all duration-200 text-left"
@@ -167,6 +181,19 @@ export function Dashboard() {
           </p>
         </button>
 
+        <button
+          onClick={() => setCurrentView("record-screen")}
+          className="group p-8 bg-gradient-to-br from-purple-50 to-fuchsia-50 border border-purple-200 rounded-lg hover:border-purple-300 transition-all duration-200 text-left"
+        >
+          <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4 group-hover:bg-purple-200 transition-colors">
+            <span className="text-xl">🎬</span>
+          </div>
+          <h3 className="text-lg font-medium text-purple-900 mb-2">Record Screen</h3>
+          <p className="text-purple-700 text-sm">
+            Graba tu pantalla y escucha el audio extraído de la grabación
+          </p>
+        </button>
+
         {sets.length > 0 && (
           <button
             onClick={() => {
@@ -187,8 +214,6 @@ export function Dashboard() {
           </button>
         )}
       </div>
-
-
 
       {/* Sets List */}
       {sets.length > 0 && (

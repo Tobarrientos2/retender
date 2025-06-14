@@ -77,6 +77,36 @@ graph TB
 - Persistencia de sesiones en base de datos (usar solo en memoria)
 - Edición manual de sesiones generadas
 
+## 🎙️ FUNCIÓN DE TRANSCRIPCIÓN DE AUDIO (NUEVA)
+
+### Objetivo Específico
+Implementar un servicio de transcripción de audio local basado en FastAPI + Whisper que permita al frontend cargar un audio (≤25 MB) y recibir el texto transcrito con timestamps.
+
+### Alcance MVP
+- Endpoint `POST /transcribe` disponible en `http://localhost:8000`.
+- Frontend con formulario de carga / grabación de audio, barra de progreso y visor del resultado.
+- Soporte de formatos MP3, WAV, M4A, OGG, WEBM y MP4.
+- Selección opcional de idioma, modelo y temperatura.
+
+### Éxito Funcional
+- Usuario puede seleccionar/​grabar audio y visualizar la transcripción en ≤ 30 s.
+- Precisión aceptable (modelo Whisper `base` ≥ 85 % en tests de muestra).
+
+### Especificaciones Técnicas Adicionales
+- **Backend**: Python 3.10, FastAPI 0.110+, Uvicorn con autoreload.
+- **Modelo**: OpenAI Whisper (`tiny`-`large`), descargado al inicializar.
+- **Almacenamiento Temporal**: `/temp` limpieza automática mediante `BackgroundTasks`.
+- **Frontend**: Uso del cliente `TranscriptionApiClient` existente.
+- **Tamaño Máximo**: 25 MB por archivo, validado tanto en frontend como backend.
+
+### Dependencias
+- Biblioteca `whisper` ó `openai-whisper` (según disponibilidad local).
+- `ffmpeg` instalado en la máquina para procesamiento de audio.
+
+### Riesgos / Consideraciones
+- Carga de modelo Whisper grande (> 1 GB) requiere memoria; por ahora usar modelo `base`.
+- Timeout de transcripción configurado en 5 min para archivos largos.
+
 ## 🔧 ESPECIFICACIONES TÉCNICAS
 ### Frontend Specifications:
 - **Framework**: Next.js-style React 19 con Vite

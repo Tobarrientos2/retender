@@ -13,6 +13,15 @@
 - ✅ Manejo de errores y loading states implementado
 **DURACIÓN REAL**: 1 día (más rápido de lo estimado)
 
+### 📅 SPRINT 1.5 (TRANSCRIPCIÓN DE AUDIO LOCAL)
+**TAREAS INCLUIDAS**: P0.A1, P0.A2, P0.A3
+**OBJETIVO DEL SPRINT**: Implementar y probar end-to-end la funcionalidad de transcripción de audio local.
+**CRITERIOS DE ACEPTACIÓN**:
+- Backend FastAPI operativo en `http://localhost:8000` con modelo Whisper `base`.
+- Componente `TranscriberForm` permite subir/grabar audio y muestra la transcripción.
+- Test Playwright valida flujo Audio→Texto sin errores.
+**DURACIÓN ESTIMADA**: 1 día
+
 ### 📅 SPRINT ANTERIOR (REBRANDING) - ✅ COMPLETADO
 **TAREAS INCLUIDAS**: P0.4, P0.5, P0.6, P0.7
 **OBJETIVO DEL SPRINT**: Rebranding completo de Kioku a Retender + eliminación de grabación de pantalla
