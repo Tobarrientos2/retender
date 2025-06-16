@@ -9,6 +9,7 @@ const applicationTables = {
     description: v.optional(v.string()),
     sourceContent: v.string(),
     totalAffirmations: v.number(),
+    metadata: v.optional(v.any()), // Para información de audio transcription
   }).index("by_user", ["userId"]),
 
   affirmations: defineTable({
@@ -70,6 +71,8 @@ const applicationTables = {
     autoTranscribe: v.boolean(),  // Auto-transcribir después de grabar
     preferredLanguage: v.string(), // Idioma preferido para transcripción
   }).index("by_user", ["userId"]),
+
+
 
 };
 

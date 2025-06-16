@@ -8,6 +8,7 @@ import { AffirmationSetList } from "./AffirmationSetList";
 import { CreateSessions } from "./CreateSessions";
 import { SessionsList } from "./SessionsList";
 import { SessionCollectionsList } from "./SessionCollectionsList";
+
 import { RecordScreen } from "./RecordScreen";
 import { RecordingSettings } from "./RecordingSettings";
 
@@ -31,12 +32,14 @@ export function Dashboard() {
     | "sessions"
     | "sessions-list"
     | "collections"
+
     | "record-screen"
     | "recording-settings"
   >("home");
   const [selectedSetId, setSelectedSetId] = useState<Id<"affirmationSets"> | null>(null);
   const [selectedCollectionId, setSelectedCollectionId] = useState<Id<"sessionCollections"> | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
+
 
   const sets = useQuery(api.affirmations.getUserSets) || [];
 
@@ -81,6 +84,8 @@ export function Dashboard() {
       />
     );
   }
+
+
 
   if (currentView === "sessions-list" && selectedCollectionId) {
     return (
@@ -175,6 +180,8 @@ export function Dashboard() {
             View and practice your saved session collections
           </p>
         </button>
+
+
 
         <button
           onClick={() => setCurrentView("create")}

@@ -155,30 +155,34 @@ function generatePrompt(content: string, contentType: 'programming' | 'general')
   const baseInstructions = `
 You must carefully analyze the following content and create exactly 3 powerful, insightful affirmations that are SPECIFICALLY about the material provided.
 
+IMPORTANT LANGUAGE REQUIREMENT: Generate ALL affirmations in SPANISH (español). Do not use English.
+
 IMPORTANT: Your affirmations must be based on the SPECIFIC details, facts, concepts, and information contained in the content below. Do NOT create generic statements.
 
 Content to analyze:
 ${content}
 
 REQUIREMENTS:
+- Generate ALL affirmations in SPANISH language
 - Read and understand the ENTIRE content above
 - Extract SPECIFIC facts, concepts, names, dates, places, or technical details
 - Create affirmations that demonstrate you understood the specific content
 - Include specific terminology, names, or concepts from the material
 - Avoid generic statements that could apply to any content
+- Use proper Spanish grammar and vocabulary
 
 Respond with a JSON array of exactly 3 affirmations in this exact format:
 [
   {
-    "content": "First affirmation with SPECIFIC details from the content",
+    "content": "Primera afirmación con detalles ESPECÍFICOS del contenido",
     "order": 1
   },
   {
-    "content": "Second affirmation with SPECIFIC details from the content",
+    "content": "Segunda afirmación con detalles ESPECÍFICOS del contenido",
     "order": 2
   },
   {
-    "content": "Third affirmation with SPECIFIC details from the content",
+    "content": "Tercera afirmación con detalles ESPECÍFICOS del contenido",
     "order": 3
   }
 ]
@@ -188,38 +192,38 @@ Only return the JSON array, no other text.`;
   if (contentType === 'programming') {
     return `${baseInstructions}
 
-PROGRAMMING CONTENT RULES:
-- Each affirmation must be maximum 15 words for the main statement
-- You can add up to 30 additional words of code syntax/examples after the main statement
-- Include SPECIFIC code snippets, function names, or syntax examples FROM THE CONTENT
-- Focus on the SPECIFIC programming concepts, libraries, or technologies mentioned
-- Use the EXACT technical terminology from the provided content
-- Write in OBJECTIVE, THIRD-PERSON language (NO "I" statements)
-- Format: "Specific concept from content (max 15 words) + relevant code example (max 30 words)"
+PROGRAMMING CONTENT RULES (EN ESPAÑOL):
+- Cada afirmación debe tener máximo 15 palabras para la declaración principal
+- Puedes agregar hasta 30 palabras adicionales de sintaxis/ejemplos de código después de la declaración principal
+- Incluye fragmentos de código ESPECÍFICOS, nombres de funciones o ejemplos de sintaxis DEL CONTENIDO
+- Enfócate en los conceptos de programación ESPECÍFICOS, librerías o tecnologías mencionadas
+- Usa la terminología técnica EXACTA del contenido proporcionado
+- Escribe en lenguaje OBJETIVO, TERCERA PERSONA (NO declaraciones con "Yo")
+- Formato: "Concepto específico del contenido (máx 15 palabras) + ejemplo de código relevante (máx 30 palabras)"
 
-EXAMPLES of SPECIFIC programming affirmations:
-- "React useState hook manages component state efficiently. const [count, setCount] = useState(0) initializes state variables."
-- "Express middleware processes requests sequentially. app.use((req, res, next) => { next(); }) enables request handling."
+EJEMPLOS de afirmaciones de programación ESPECÍFICAS en ESPAÑOL:
+- "React useState hook gestiona el estado del componente eficientemente. const [count, setCount] = useState(0) inicializa variables de estado."
+- "Express middleware procesa solicitudes secuencialmente. app.use((req, res, next) => { next(); }) habilita el manejo de solicitudes."
 
-AVOID generic programming statements - use SPECIFIC details from the content provided.`;
+EVITA declaraciones genéricas de programación - usa detalles ESPECÍFICOS del contenido proporcionado.`;
   } else {
     return `${baseInstructions}
 
-GENERAL CONTENT RULES:
-- Each affirmation must be maximum 15 words
-- Be concise, impactful, and memorable
-- Include SPECIFIC names, dates, places, or facts FROM THE CONTENT
-- Use EXACT terminology and proper nouns from the provided material
-- Write in OBJECTIVE, THIRD-PERSON language (NO "I" statements)
-- Focus on the SPECIFIC insights, facts, and principles mentioned in the content
-- No code or technical syntax needed
+GENERAL CONTENT RULES (EN ESPAÑOL):
+- Cada afirmación debe tener máximo 15 palabras
+- Sé conciso, impactante y memorable
+- Incluye nombres ESPECÍFICOS, fechas, lugares o hechos DEL CONTENIDO
+- Usa terminología EXACTA y nombres propios del material proporcionado
+- Escribe en lenguaje OBJETIVO, TERCERA PERSONA (NO declaraciones con "Yo")
+- Enfócate en las ideas ESPECÍFICAS, hechos y principios mencionados en el contenido
+- No se necesita código o sintaxis técnica
 
-EXAMPLES of SPECIFIC general affirmations:
-- "Chile extends 4,300 kilometers from north to south, making it the world's longest country."
-- "The French Revolution began in 1789 with the financial crisis and Estates-General convocation."
-- "Santiago serves as Chile's capital and most populous city in South America."
+EJEMPLOS de afirmaciones generales ESPECÍFICAS en ESPAÑOL:
+- "Chile se extiende 4,300 kilómetros de norte a sur, siendo el país más largo del mundo."
+- "La Revolución Francesa comenzó en 1789 con la crisis financiera y la convocatoria de los Estados Generales."
+- "Santiago sirve como la capital de Chile y la ciudad más poblada de Sudamérica."
 
-AVOID generic statements - use SPECIFIC details, names, dates, and facts from the content provided.`;
+EVITA declaraciones genéricas - usa detalles ESPECÍFICOS, nombres, fechas y hechos del contenido proporcionado.`;
   }
 }
 

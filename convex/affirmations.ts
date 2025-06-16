@@ -138,6 +138,62 @@ export const generateSessions = action({
   },
 });
 
+export const createAffirmationsFromTranscription = action({
+  args: {
+    transcriptionText: v.string(),
+    title: v.optional(v.string()),
+    language: v.optional(v.string()),
+    audioInfo: v.optional(v.object({
+      duration: v.number(),
+      processingTime: v.number(),
+    })),
+  },
+  handler: async (ctx, args): Promise<string> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    // Validate content length
+    if (args.transcriptionText.length < 50) {
+      throw new Error("La transcripción es muy corta para generar afirmaciones de calidad");
+    }
+
+    // Generate affirmations using AI (using the existing generateAffirmations function)
+    // Add language context to ensure Spanish generation
+    const contentWithLanguageContext = `IDIOMA DETECTADO: ${args.language || 'español'}
+
+CONTENIDO PARA ANALIZAR:
+${args.transcriptionText}
+
+NOTA: Genera todas las afirmaciones en español, independientemente del idioma del contenido original.`;
+
+    const affirmations: Array<{ content: string; order: number }> = await ctx.runAction(internal.ai.generateAffirmations, {
+      content: contentWithLanguageContext,
+    });
+
+    // Create the set with transcription-specific metadata
+    const title = args.title || `Afirmaciones de Audio - ${new Date().toLocaleDateString()}`;
+
+    const setId = await ctx.runMutation(internal.affirmations.createSet, {
+      userId,
+      title,
+      content: args.transcriptionText,
+      totalAffirmations: affirmations.length,
+    });
+
+    // Create individual affirmations
+    for (const affirmation of affirmations) {
+      await ctx.runMutation(internal.affirmations.createAffirmation, {
+        setId,
+        userId,
+        content: affirmation.content,
+        order: affirmation.order,
+      });
+    }
+
+    return setId;
+  },
+});
+
 export const analyzeImage = action({
   args: {
     imageBase64: v.string(),
@@ -186,6 +242,8 @@ export const createSet = internalMutation({
     });
   },
 });
+
+
 
 export const createAffirmation = internalMutation({
   args: {
@@ -268,6 +326,8 @@ export const getSessionCollections = query({
       .collect();
   },
 });
+
+
 
 export const getSessionCollection = query({
   args: { collectionId: v.id("sessionCollections") },
@@ -359,3 +419,5 @@ export const getSessionForPractice = query({
     };
   },
 });
+
+

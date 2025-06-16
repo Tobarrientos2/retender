@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ScreenRecorder } from './ScreenRecorder';
 import { toast } from 'sonner';
 import { transcriptionService, TranscriptionResponse } from '../services/transcriptionService';
+import { useAction } from 'convex/react';
+import { api } from '../../convex/_generated/api';
 
 interface RecordScreenProps {
   onBack: () => void;
@@ -14,7 +16,11 @@ export function RecordScreen({ onBack }: RecordScreenProps) {
   const [audioInfo, setAudioInfo] = useState<{duration: number, channels: number, sampleRate: number} | null>(null);
   const [transcription, setTranscription] = useState<TranscriptionResponse | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [isGeneratingAffirmations, setIsGeneratingAffirmations] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  // Convex actions
+  const createAffirmationsFromTranscription = useAction(api.affirmations.createAffirmationsFromTranscription);
 
   // Configurar el audio cuando cambie el audioBlob
   useEffect(() => {
@@ -118,12 +124,64 @@ export function RecordScreen({ onBack }: RecordScreenProps) {
     }
   };
 
+  const handleGenerateAffirmations = async () => {
+    if (!transcription?.text) {
+      toast.error('No hay transcripción disponible para generar afirmaciones');
+      return;
+    }
+
+    if (transcription.text.length < 50) {
+      toast.error('La transcripción es muy corta. Necesita al menos 50 caracteres para generar afirmaciones de calidad');
+      return;
+    }
+
+    setIsGeneratingAffirmations(true);
+
+    try {
+      const title = `Afirmaciones de Audio - ${new Date().toLocaleDateString()}`;
+
+      console.log('Generando afirmaciones desde transcripción...', {
+        title,
+        contentLength: transcription.text.length,
+        language: transcription.language,
+        audioInfo
+      });
+
+      const setId = await createAffirmationsFromTranscription({
+        transcriptionText: transcription.text,
+        title,
+        language: transcription.language,
+        audioInfo: audioInfo ? {
+          duration: audioInfo.duration,
+          processingTime: transcription.processing_time || 0,
+        } : undefined,
+      });
+
+      toast.success('¡Afirmaciones generadas exitosamente desde la transcripción!');
+
+      console.log('Afirmaciones creadas con ID:', setId);
+
+      // Mostrar información adicional
+      setTimeout(() => {
+        toast.info('Puedes encontrar tus nuevas afirmaciones en el Dashboard principal');
+      }, 2000);
+
+    } catch (error) {
+      console.error('Error generando afirmaciones:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Error al generar afirmaciones';
+      toast.error(`Error: ${errorMessage}`);
+    } finally {
+      setIsGeneratingAffirmations(false);
+    }
+  };
+
   const handleClearAll = () => {
     setAudioBlob(null);
     setVideoBlob(null);
     setAudioInfo(null);
     setTranscription(null);
     setIsPlaying(false);
+    setIsGeneratingAffirmations(false);
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
@@ -316,6 +374,40 @@ export function RecordScreen({ onBack }: RecordScreenProps) {
               {/* Main Text */}
               <div className="bg-white p-4 rounded-lg border mb-4">
                 <p className="text-gray-800 leading-relaxed">{transcription.text}</p>
+              </div>
+
+              {/* Generate Affirmations Button */}
+              <div className="mb-4">
+                <button
+                  onClick={handleGenerateAffirmations}
+                  disabled={isGeneratingAffirmations || !transcription.text || transcription.text.length < 50}
+                  className={`w-full px-4 py-3 rounded-lg font-medium transition-colors ${
+                    isGeneratingAffirmations
+                      ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
+                      : transcription.text.length < 50
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-orange-500 text-white hover:bg-orange-600'
+                  }`}
+                >
+                  {isGeneratingAffirmations ? (
+                    <>
+                      <span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
+                      Generando Afirmaciones...
+                    </>
+                  ) : (
+                    '✨ Generar Afirmaciones de Estudio'
+                  )}
+                </button>
+                {transcription.text.length < 50 && (
+                  <p className="text-xs text-orange-600 mt-1 text-center">
+                    Necesita al menos 50 caracteres para generar afirmaciones de calidad
+                  </p>
+                )}
+                {transcription.text.length >= 50 && (
+                  <p className="text-xs text-green-600 mt-1 text-center">
+                    ✅ Transcripción lista para generar afirmaciones ({transcription.text.length} caracteres)
+                  </p>
+                )}
               </div>
               
               {/* Metadata */}
