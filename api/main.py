@@ -103,7 +103,7 @@ async def transcribe_audio(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(..., description="Archivo de audio a transcribir"),
     language: Optional[str] = Form(default="auto", description="Idioma del audio (auto, es, en, fr, etc.)"),
-    model: Optional[str] = Form(default="base", description="Modelo Whisper (tiny, base, small, medium, large)"),
+    model: Optional[str] = Form(default="large", description="Modelo Whisper (tiny, base, small, medium, large)"),
     return_timestamps: bool = Form(default=True, description="Incluir timestamps en la transcripción"),
     temperature: float = Form(default=0.0, description="Temperatura para la transcripción (0.0-1.0)"),
     initial_prompt: Optional[str] = Form(default=None, description="Prompt inicial para mejorar la transcripción")
@@ -190,7 +190,7 @@ async def transcribe_simple(
 ):
     """
     Endpoint simplificado para transcripción rápida
-    Usa configuración por defecto: modelo base, español, con timestamps
+    Usa configuración por defecto: modelo large, español, con timestamps
     """
     
     # Reutilizar la lógica del endpoint principal
@@ -198,7 +198,7 @@ async def transcribe_simple(
         background_tasks=background_tasks,
         file=file,
         language="es",
-        model="base",
+        model="large",
         return_timestamps=True,
         temperature=0.0,
         initial_prompt=None

@@ -37,7 +37,7 @@ export interface TranscriptionError {
 }
 
 export class TranscriptionService {
-  private readonly baseUrl = 'http://localhost:8000';
+  private readonly baseUrl = 'http://localhost:9000';
 
   async transcribeAudio(
     audioBlob: Blob,

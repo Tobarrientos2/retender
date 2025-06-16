@@ -116,13 +116,15 @@ class AudioProcessor:
                 lambda: ffmpeg.run(stream, overwrite_output=True, quiet=True)
             )
             
-        except ffmpeg.Error as e:
-            logger.error(f"❌ Error FFmpeg: {e}")
-            # Fallback a pydub si FFmpeg falla
-            await self._process_with_pydub(input_path, output_path)
         except Exception as e:
-            logger.error(f"❌ Error procesando con FFmpeg: {e}")
-            raise
+            # Verificar si es un error específico de FFmpeg
+            if 'ffmpeg' in str(e).lower() or 'av' in str(e).lower():
+                logger.error(f"❌ Error FFmpeg: {e}")
+                # Fallback a pydub si FFmpeg falla
+                await self._process_with_pydub(input_path, output_path)
+            else:
+                logger.error(f"❌ Error procesando con FFmpeg: {e}")
+                raise
     
     async def _process_with_pydub(self, input_path: str, output_path: str):
         """Procesar audio usando pydub (fallback)"""

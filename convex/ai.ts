@@ -422,49 +422,155 @@ export const generateAntiAffirmations = internalAction({
       .map(aff => `${aff.order}. "${aff.content}"`)
       .join('\n');
 
-    const prompt = `
-You are tasked with creating subtle, deceptive anti-affirmations based on the following TRUE affirmations.
+    // Retry logic optimizado para evitar timeouts largos
+    const maxRetries = 2; // Reducir reintentos
+    let lastError = null;
 
-ORIGINAL TRUE AFFIRMATIONS:
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`🔄 Attempt ${attempt}/${maxRetries} to generate anti-affirmations`);
+
+        const prompt = `
+🚨 ATENCIÓN: Tu única tarea es generar paráfrasis INCORRECTAS con errores técnicos deliberados. 🚨
+
+❌ PROHIBIDO ABSOLUTAMENTE: Generar paráfrasis correctas o técnicamente precisas
+✅ OBLIGATORIO: Cada paráfrasis DEBE contener errores de vocabulario técnico
+
+Eres un simulador de errores estudiantiles que crea paráfrasis INCORRECTAS para ejercicios de aprendizaje.
+
+AFIRMACIONES ORIGINALES CORRECTAS:
 ${affirmationsText}
 
-INSTRUCTIONS:
-- Create exactly 3 anti-affirmations that look almost identical to the originals
-- Make SUBTLE changes that make each statement factually incorrect
-- The errors should be difficult to detect at first glance
-- Maintain the same structure, length, and technical terminology
-- Keep the same professional tone and formatting
-- Changes can include: wrong function names, incorrect concepts, reversed logic, false facts
+🎯 MISIÓN CRÍTICA: Crear exactamente 3 paráfrasis INCORRECTAS con ERRORES CONCEPTUALES evidentes que simulen malentendidos de estudiantes. NUNCA generes paráfrasis correctas.
 
-EXAMPLES of subtle changes:
-- "useState()" → "useStatus()" (wrong function name)
-- "manages state" → "manages props" (wrong concept)
-- "1789" → "1879" (wrong date)
-- "increases" → "decreases" (reversed logic)
+📋 REGLAS OBLIGATORIAS (CUMPLIR AL 100%):
+1. ❌ CADA paráfrasis DEBE contener ERRORES CONCEPTUALES + vocabulario impreciso
+2. ❌ INCLUIR información INCORRECTA (fechas erróneas, datos falsos, conceptos confundidos)
+3. ❌ NUNCA uses el vocabulario técnico correcto del original
+4. ❌ CAMBIAR hechos importantes para crear errores evidentes
+5. ❌ PROHIBIDO usar analogías, comparaciones o metáforas ("como si", "parecido a", "igual que")
+6. ✅ Combinar vocabulario impreciso CON errores factuales
+7. ❌ Si la paráfrasis es factualmente correcta, FALLAS completamente en tu tarea
 
-Respond with a JSON array of exactly 3 anti-affirmations in this exact format:
+TRANSFORMACIONES OBLIGATORIAS (EJEMPLOS ESPECÍFICOS):
+**Programación:**
+- "subprocesos" → "mini tareas", "tareas pequeñas", "procesos chicos"
+- "algoritmo" → "fórmula", "receta", "método simple"
+- "framework" → "programa base", "herramienta general", "plantilla"
+- "API" → "conector", "enlace", "puente"
+- "debugging" → "arreglar errores", "encontrar problemas"
+- "compilar" → "convertir", "transformar", "procesar"
+- "variables" → "cajitas", "contenedores", "espacios"
+- "funciones" → "comandos", "instrucciones", "bloques"
+
+**Sistemas:**
+- "gestión de memoria" → "organizar datos", "manejar información"
+- "autenticación" → "verificar usuario", "comprobar identidad"
+- "optimización" → "hacer mejor", "mejorar rendimiento"
+- "implementación" → "poner en práctica", "hacer funcionar"
+- "concurrencia" → "hacer varias cosas", "multitarea"
+- "encapsulación" → "guardar datos", "proteger información"
+- "herencia" → "copiar características", "pasar propiedades"
+- "polimorfismo" → "cambiar formas", "adaptarse"
+
+**Redes:**
+- "protocolo" → "reglas", "formato", "manera de comunicarse"
+- "servidor" → "computadora central", "máquina principal"
+- "cliente" → "usuario", "computadora que pide"
+- "latencia" → "demora", "tiempo de espera"
+- "ancho de banda" → "velocidad", "capacidad"
+
+**Historia/General CON ERRORES CONCEPTUALES:**
+- "Segunda Guerra Mundial (1939-1945)" → "Gran Guerra de los años 30" (fecha incorrecta)
+- "conflicto global" → "pelea entre algunos países" (minimizar alcance)
+- "dos alianzas principales" → "tres bandos principales" (número incorrecto)
+- "Eje vs Aliados" → "Buenos vs Malos" (simplificación extrema)
+- "participaron la mayoría de países" → "solo participaron 10 países" (dato falso)
+
+**Ejemplos de ERRORES CONCEPTUALES que DEBES incluir:**
+- Cambiar fechas: "1939-1945" → "1930-1940" o "1940-1950"
+- Cambiar números: "dos alianzas" → "tres grupos" o "cuatro equipos"
+- Cambiar alcance: "mundial" → "europea" o "solo en Asia"
+- Confundir conceptos: "guerra" → "competencia" o "torneo"
+- Datos falsos: "6 años" → "10 años" o "3 años"
+
+INSTRUCCIONES ESPECÍFICAS PARA ERRORES EVIDENTES:
+- Crea exactamente 3 paráfrasis INCORRECTAS en español
+- CADA paráfrasis DEBE incluir AL MENOS 1 ERROR FACTUAL EVIDENTE
+- COMBINA vocabulario impreciso + información incorrecta
+- Los errores deben ser OBVIOS para que el estudiante los detecte fácilmente
+- CAMBIA fechas, números, conceptos clave del contenido original
+- NUNCA uses términos técnicos correctos del original
+- PROHIBIDO: analogías, comparaciones, metáforas, ejemplos ("como", "parecido a", "igual que")
+- OBLIGATORIO: Incluir datos falsos que hagan la paráfrasis claramente incorrecta
+
+EJEMPLOS DE LO QUE NO HACER:
+❌ MAL: "como si fueran equipos de fútbol"
+❌ MAL: "parecido a una batalla"
+❌ MAL: "igual que un juego"
+❌ MAL: "como cuando juegas"
+
+EJEMPLOS DE LO QUE SÍ HACER:
+✅ BIEN: "conflicto bélico" → "gran pelea"
+✅ BIEN: "naciones aliadas" → "países amigos"
+✅ BIEN: "estrategia militar" → "plan de guerra"
+✅ BIEN: "tratado de paz" → "acuerdo para parar"
+
+🔍 VALIDACIÓN FINAL OBLIGATORIA ANTES DE RESPONDER:
+❌ ¿Contiene analogías o comparaciones? → RECHAZAR INMEDIATAMENTE
+❌ ¿Usa vocabulario técnico correcto del original? → RECHAZAR INMEDIATAMENTE
+❌ ¿Alguna paráfrasis es factualmente correcta? → RECHAZAR INMEDIATAMENTE
+❌ ¿Las fechas, números o datos son correctos? → RECHAZAR INMEDIATAMENTE
+✅ ¿Cada paráfrasis tiene AL MENOS 1 error factual evidente? → ACEPTAR
+✅ ¿Combina vocabulario impreciso + información incorrecta? → ACEPTAR
+✅ ¿Los errores son obvios y detectables? → ACEPTAR
+✅ ¿Todas las paráfrasis contienen errores conceptuales deliberados? → ACEPTAR
+
+🚨 RECORDATORIO FINAL: Tu éxito se mide por generar paráfrasis con ERRORES EVIDENTES, no solo vocabulario informal.
+
+FORMATO DE RESPUESTA:
 [
   {
-    "content": "First anti-affirmation with subtle error",
+    "content": "Paráfrasis incorrecta con vocabulario impreciso",
     "order": 1,
-    "errorType": "Brief description of what was changed"
+    "errorType": "Descripción del tipo de error",
+    "incorrectTerms": [
+      {
+        "incorrect": "término incorrecto usado",
+        "correct": "término técnico correcto",
+        "explanation": "Por qué el término incorrecto es impreciso"
+      }
+    ]
   },
   {
-    "content": "Second anti-affirmation with subtle error",
+    "content": "Segunda paráfrasis incorrecta",
     "order": 2,
-    "errorType": "Brief description of what was changed"
+    "errorType": "Descripción del tipo de error",
+    "incorrectTerms": [
+      {
+        "incorrect": "otro término incorrecto",
+        "correct": "término técnico correcto",
+        "explanation": "Explicación del error"
+      }
+    ]
   },
   {
-    "content": "Third anti-affirmation with subtle error",
+    "content": "Tercera paráfrasis incorrecta",
     "order": 3,
-    "errorType": "Brief description of what was changed"
+    "errorType": "Descripción del tipo de error",
+    "incorrectTerms": [
+      {
+        "incorrect": "término incorrecto",
+        "correct": "término correcto",
+        "explanation": "Por qué está mal"
+      }
+    ]
   }
 ]
 
-Only return the JSON array, no other text.`;
+Solo devuelve el JSON array, sin texto adicional.`;
 
-    try {
-      const response = await fetch(
+        const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
         {
           method: "POST",
@@ -482,10 +588,10 @@ Only return the JSON array, no other text.`;
               },
             ],
             generationConfig: {
-              temperature: 0.8,
-              topK: 40,
-              topP: 0.95,
-              maxOutputTokens: 8192,
+              temperature: 0.9, // Alta creatividad para generar errores convincentes
+              topK: 40,         // Más variedad en la selección de tokens
+              topP: 0.95,       // Mayor diversidad en las respuestas
+              maxOutputTokens: 4096, // Reducir tokens para respuestas más rápidas
             },
           }),
         }
@@ -523,14 +629,43 @@ Only return the JSON array, no other text.`;
             antiAff.order < 1 || antiAff.order > 3) {
           throw new Error("Invalid anti-affirmation structure");
         }
+
+        // Validate no analogies or comparisons
+        const content = antiAff.content.toLowerCase();
+        const analogyPatterns = [
+          'como si', 'parecido a', 'igual que', 'como cuando',
+          'similar a', 'como un', 'como una', 'tipo', 'estilo',
+          'como el', 'como la', 'como los', 'como las'
+        ];
+
+        for (const pattern of analogyPatterns) {
+          if (content.includes(pattern)) {
+            throw new Error(`Anti-affirmation contains forbidden analogy: "${pattern}"`);
+          }
+        }
       }
 
+      console.log(`✅ Attempt ${attempt} successful - generated valid anti-affirmations`);
       return antiAffirmations;
+
     } catch (error) {
-      console.error("Error generating anti-affirmations:", error);
-      const message = error instanceof Error ? error.message : "Unknown error";
-      throw new Error(`Failed to generate anti-affirmations: ${message}`);
+        lastError = error;
+        const message = error instanceof Error ? error.message : "Unknown error";
+        console.log(`❌ Attempt ${attempt}/${maxRetries} failed: ${message}`);
+
+        if (attempt === maxRetries) {
+          console.error("All retry attempts failed for anti-affirmations generation");
+          break;
+        }
+
+        // Wait before retry (backoff reducido)
+        await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+      }
     }
+
+    // If we get here, all retries failed
+    const finalMessage = lastError instanceof Error ? lastError.message : "Unknown error";
+    throw new Error(`Failed to generate anti-affirmations after ${maxRetries} attempts: ${finalMessage}`);
   },
 });
 
@@ -779,6 +914,389 @@ If the image contains educational diagrams or visual concepts, describe them in 
       console.error("Error analyzing image:", error);
       const message = error instanceof Error ? error.message : "Unknown error";
       throw new Error(`Failed to analyze image: ${message}`);
+    }
+  },
+});
+
+export const evaluateParaphrase = internalAction({
+  args: {
+    originalText: v.string(),
+    paraphraseText: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY environment variable is required");
+    }
+
+    const prompt = `
+Eres un evaluador experto de paráfrasis educativas. Tu tarea es evaluar si una paráfrasis captura correctamente el concepto esencial del texto original.
+
+TEXTO ORIGINAL:
+"${args.originalText}"
+
+PARÁFRASIS DEL ESTUDIANTE:
+"${args.paraphraseText}"
+
+CRITERIOS DE EVALUACIÓN:
+
+✅ PARÁFRASIS VÁLIDA si:
+- Mantiene el concepto central y significado esencial
+- Usa vocabulario diferente pero conserva la idea principal
+- Demuestra comprensión real del concepto
+- Es factualmente correcta
+- Captura los elementos técnicos importantes
+
+❌ PARÁFRASIS INVÁLIDA si:
+- Cambia el significado fundamental
+- Contiene errores factuales
+- Omite información crítica
+- Es demasiado vaga o superficial
+- Malinterpreta conceptos técnicos
+
+PUNTUACIÓN:
+- 90-100: Excelente paráfrasis, captura perfectamente el concepto
+- 70-89: Buena paráfrasis, concepto bien entendido con pequeñas imprecisiones
+- 50-69: Paráfrasis aceptable, concepto parcialmente entendido
+- 30-49: Paráfrasis deficiente, concepto mal entendido
+- 0-29: Paráfrasis incorrecta, no demuestra comprensión
+
+Responde con un JSON en este formato exacto:
+{
+  "isValid": true/false,
+  "score": número_entre_0_y_100,
+  "feedback": "Explicación detallada de la evaluación, qué está bien, qué se puede mejorar, y por qué se asignó esta puntuación. Máximo 200 palabras."
+}
+
+Solo devuelve el JSON, sin texto adicional.`;
+
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text: prompt,
+                  },
+                ],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.3,
+              topK: 20,
+              topP: 0.8,
+              maxOutputTokens: 1024,
+            },
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Gemini API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!text) {
+        throw new Error("No response from Gemini API");
+      }
+
+      // Extract JSON from the response
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error("Could not extract JSON from response");
+      }
+
+      const evaluation = JSON.parse(jsonMatch[0]);
+
+      // Validate the structure
+      if (typeof evaluation.isValid !== 'boolean' ||
+          typeof evaluation.score !== 'number' ||
+          typeof evaluation.feedback !== 'string' ||
+          evaluation.score < 0 || evaluation.score > 100) {
+        throw new Error("Invalid evaluation structure");
+      }
+
+      return evaluation;
+    } catch (error) {
+      console.error("Error evaluating paraphrase:", error);
+      const message = error instanceof Error ? error.message : "Unknown error";
+      throw new Error(`Failed to evaluate paraphrase: ${message}`);
+    }
+  },
+});
+
+export const evaluateExplanation = internalAction({
+  args: {
+    originalText: v.string(),
+    incorrectParaphrase: v.string(),
+    userExplanation: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY environment variable is required");
+    }
+
+    const prompt = `
+Eres un evaluador experto de comprensión educativa. Tu tarea es evaluar si un estudiante ha identificado correctamente los errores en una paráfrasis incorrecta.
+
+TEXTO ORIGINAL CORRECTO:
+"${args.originalText}"
+
+PARÁFRASIS INCORRECTA PRESENTADA:
+"${args.incorrectParaphrase}"
+
+EXPLICACIÓN DEL ESTUDIANTE SOBRE POR QUÉ ESTÁ MAL:
+"${args.userExplanation}"
+
+CRITERIOS DE EVALUACIÓN:
+
+✅ EXPLICACIÓN COMPLETA si identifica:
+- Errores factuales específicos en la paráfrasis
+- Vocabulario técnico impreciso o incorrecto
+- Conceptos malinterpretados o simplificados excesivamente
+- Información omitida o distorsionada
+- Diferencias clave entre el original y la paráfrasis incorrecta
+
+❌ EXPLICACIÓN INCOMPLETA si:
+- Solo menciona errores superficiales
+- No identifica los errores técnicos principales
+- Es demasiado vaga o general
+- No demuestra comprensión del concepto original
+- Omite errores evidentes en la paráfrasis
+
+PUNTUACIÓN:
+- 90-100: Identificó todos los errores principales y demuestra comprensión completa
+- 70-89: Identificó la mayoría de errores importantes con buena comprensión
+- 50-69: Identificó algunos errores pero omitió puntos clave
+- 30-49: Explicación superficial, pocos errores identificados correctamente
+- 0-29: No identificó los errores principales o explicación incorrecta
+
+FEEDBACK ESPECÍFICO:
+- Menciona qué errores identificó correctamente
+- Señala qué errores importantes omitió (si los hay)
+- Sugiere qué aspectos debería considerar para mejorar su análisis
+
+Responde con un JSON en este formato exacto:
+{
+  "isComplete": true/false,
+  "score": número_entre_0_y_100,
+  "feedback": "Explicación detallada de la evaluación, qué errores identificó correctamente, cuáles omitió, y cómo puede mejorar su análisis. Máximo 250 palabras.",
+  "missedErrors": ["error1", "error2"] // Array de errores importantes que no identificó
+}
+
+Solo devuelve el JSON, sin texto adicional.`;
+
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text: prompt,
+                  },
+                ],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.3,
+              topK: 20,
+              topP: 0.8,
+              maxOutputTokens: 1024,
+            },
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Gemini API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!text) {
+        throw new Error("No response from Gemini API");
+      }
+
+      // Extract JSON from the response
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error("Could not extract JSON from response");
+      }
+
+      const evaluation = JSON.parse(jsonMatch[0]);
+
+      // Validate the structure
+      if (typeof evaluation.isComplete !== 'boolean' ||
+          typeof evaluation.score !== 'number' ||
+          typeof evaluation.feedback !== 'string' ||
+          !Array.isArray(evaluation.missedErrors) ||
+          evaluation.score < 0 || evaluation.score > 100) {
+        throw new Error("Invalid explanation evaluation structure");
+      }
+
+      return evaluation;
+    } catch (error) {
+      console.error("Error evaluating explanation:", error);
+      const message = error instanceof Error ? error.message : "Unknown error";
+      throw new Error(`Failed to evaluate explanation: ${message}`);
+    }
+  },
+});
+
+export const generateTermExplanations = internalAction({
+  args: {
+    term: v.string(),
+    context: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY environment variable is required");
+    }
+
+    const prompt = `
+Eres un experto educador que crea afirmaciones explicativas para términos técnicos desconocidos.
+
+TÉRMINO A EXPLICAR: "${args.term}"
+CONTEXTO ORIGINAL: "${args.context}"
+
+MISIÓN: Crear exactamente 3 afirmaciones educativas que expliquen este término de manera clara y progresiva.
+
+CRITERIOS PARA LAS AFIRMACIONES:
+1. **Definición básica**: Qué es el término en palabras simples
+2. **Función/Propósito**: Para qué sirve o por qué es importante
+3. **Ejemplo/Aplicación**: Cómo se aplica en el contexto dado
+
+REGLAS:
+- Cada afirmación debe ser independiente y completa
+- Usar lenguaje claro y accesible
+- Mantener el contexto técnico pero explicado
+- Progresión de lo básico a lo específico
+- Todas las afirmaciones en español
+- Máximo 150 caracteres por afirmación
+
+EJEMPLO:
+Término: "recolección de basura"
+Contexto: "El lenguaje incluye subprocesos, uno de los cuales es la recolección de basura"
+
+Respuesta:
+[
+  {
+    "content": "La recolección de basura es un proceso automático que libera memoria no utilizada en programas",
+    "order": 1
+  },
+  {
+    "content": "Este proceso evita que los programas consuman toda la memoria disponible del sistema",
+    "order": 2
+  },
+  {
+    "content": "En lenguajes como Java y Python, la recolección de basura funciona como subproceso en segundo plano",
+    "order": 3
+  }
+]
+
+Responde con un JSON array de exactamente 3 afirmaciones en este formato:
+[
+  {
+    "content": "Primera afirmación explicativa del término",
+    "order": 1
+  },
+  {
+    "content": "Segunda afirmación con más detalle",
+    "order": 2
+  },
+  {
+    "content": "Tercera afirmación con aplicación específica",
+    "order": 3
+  }
+]
+
+Solo devuelve el JSON array, sin texto adicional.`;
+
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text: prompt,
+                  },
+                ],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.5,
+              topK: 40,
+              topP: 0.95,
+              maxOutputTokens: 2048,
+            },
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Gemini API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!text) {
+        throw new Error("No response from Gemini API");
+      }
+
+      // Extract JSON from the response
+      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) {
+        throw new Error("Could not extract JSON from response");
+      }
+
+      const explanations = JSON.parse(jsonMatch[0]);
+
+      // Validate the structure
+      if (!Array.isArray(explanations) || explanations.length !== 3) {
+        throw new Error("Must generate exactly 3 explanations");
+      }
+
+      for (const explanation of explanations) {
+        if (!explanation.content || !explanation.order ||
+            typeof explanation.content !== 'string' ||
+            typeof explanation.order !== 'number' ||
+            explanation.order < 1 || explanation.order > 3) {
+          throw new Error("Invalid explanation structure");
+        }
+      }
+
+      return explanations;
+    } catch (error) {
+      console.error("Error generating term explanations:", error);
+      const message = error instanceof Error ? error.message : "Unknown error";
+      throw new Error(`Failed to generate term explanations: ${message}`);
     }
   },
 });

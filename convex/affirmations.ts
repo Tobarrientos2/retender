@@ -425,4 +425,61 @@ export const getSessionForPractice = query({
   },
 });
 
+export const evaluateParaphrase = action({
+  args: {
+    originalText: v.string(),
+    paraphraseText: v.string(),
+  },
+  handler: async (ctx, args): Promise<{
+    isValid: boolean;
+    feedback: string;
+    score: number;
+  }> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
 
+    return await ctx.runAction(internal.ai.evaluateParaphrase, {
+      originalText: args.originalText,
+      paraphraseText: args.paraphraseText,
+    });
+  },
+});
+
+export const evaluateExplanation = action({
+  args: {
+    originalText: v.string(),
+    incorrectParaphrase: v.string(),
+    userExplanation: v.string(),
+  },
+  handler: async (ctx, args): Promise<{
+    isComplete: boolean;
+    feedback: string;
+    score: number;
+    missedErrors: string[];
+  }> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    return await ctx.runAction(internal.ai.evaluateExplanation, {
+      originalText: args.originalText,
+      incorrectParaphrase: args.incorrectParaphrase,
+      userExplanation: args.userExplanation,
+    });
+  },
+});
+
+export const generateTermExplanations = action({
+  args: {
+    term: v.string(),
+    context: v.string(),
+  },
+  handler: async (ctx, args): Promise<Array<{ content: string; order: number }>> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    return await ctx.runAction(internal.ai.generateTermExplanations, {
+      term: args.term,
+      context: args.context,
+    });
+  },
+});

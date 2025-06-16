@@ -11,7 +11,7 @@ class TranscriptionRequest(BaseModel):
     """Modelo para request de transcripción"""
     audio_file_path: str = Field(..., description="Ruta del archivo de audio")
     language: Optional[str] = Field(None, description="Idioma del audio (None para auto-detección)")
-    model: str = Field(default="base", description="Modelo Whisper a usar")
+    model: str = Field(default="large", description="Modelo Whisper a usar")
     return_timestamps: bool = Field(default=True, description="Incluir timestamps")
     temperature: float = Field(default=0.0, ge=0.0, le=1.0, description="Temperatura para transcripción")
     initial_prompt: Optional[str] = Field(None, description="Prompt inicial")
@@ -89,7 +89,7 @@ class TranscriptionStats(BaseModel):
     total_transcriptions: int = Field(default=0, description="Total de transcripciones")
     total_audio_duration: float = Field(default=0.0, description="Duración total de audio procesado")
     average_processing_time: float = Field(default=0.0, description="Tiempo promedio de procesamiento")
-    most_used_model: str = Field(default="base", description="Modelo más utilizado")
+    most_used_model: str = Field(default="large", description="Modelo más utilizado")
     most_detected_language: str = Field(default="es", description="Idioma más detectado")
 
 
@@ -97,7 +97,7 @@ class BatchTranscriptionRequest(BaseModel):
     """Request para transcripción en lote"""
     files: List[str] = Field(..., description="Lista de rutas de archivos")
     language: Optional[str] = Field(None, description="Idioma común (None para auto-detección)")
-    model: str = Field(default="base", description="Modelo Whisper a usar")
+    model: str = Field(default="large", description="Modelo Whisper a usar")
     return_timestamps: bool = Field(default=True, description="Incluir timestamps")
     temperature: float = Field(default=0.0, ge=0.0, le=1.0, description="Temperatura")
 
