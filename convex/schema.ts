@@ -59,6 +59,17 @@ const applicationTables = {
   }).index("by_user", ["userId"])
     .index("by_set", ["setId"]),
 
+  // Configuraciones de usuario para grabación de pantalla
+  userSettings: defineTable({
+    userId: v.id("users"),
+    // Configuraciones de grabación
+    silenceDuration: v.number(), // Duración en segundos para auto-stop
+    soundThreshold: v.number(),  // Umbral para detectar sonido inicial
+    silenceThreshold: v.number(), // Umbral para detectar silencio
+    // Configuraciones adicionales
+    autoTranscribe: v.boolean(),  // Auto-transcribir después de grabar
+    preferredLanguage: v.string(), // Idioma preferido para transcripción
+  }).index("by_user", ["userId"]),
 
 };
 

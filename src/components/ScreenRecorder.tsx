@@ -108,11 +108,47 @@ export function ScreenRecorder({ onRecordingComplete, onError }: ScreenRecorderP
         </div>
         
         {state.isRecording && (
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">Duración:</span>
-            <span className="text-lg font-mono text-red-600">
-              {formatDuration(state.duration)}
-            </span>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-700">Duración:</span>
+              <span className="text-lg font-mono text-red-600">
+                {formatDuration(state.duration)}
+              </span>
+            </div>
+
+            {/* Indicador de detección de sonido */}
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-700">Estado:</span>
+              <span className={`text-sm font-medium ${state.hasDetectedSound ? 'text-green-600' : 'text-yellow-600'}`}>
+                {state.hasDetectedSound ? '🔊 Monitoreando silencio' : '👂 Esperando primer sonido'}
+              </span>
+            </div>
+
+            {/* Contador de silencio */}
+            {state.hasDetectedSound && state.silenceCountdown > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700">Silencio:</span>
+                <span className="text-sm font-mono text-orange-600">
+                  🤫 Se detendrá en {state.silenceCountdown}s
+                </span>
+              </div>
+            )}
+
+            {/* Indicador de volumen */}
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-700">Volumen:</span>
+              <div className="flex items-center space-x-2">
+                <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-green-500 transition-all duration-100"
+                    style={{ width: `${Math.min(100, (state.currentVolume / 100) * 100)}%` }}
+                  />
+                </div>
+                <span className="text-xs text-gray-500">
+                  {Math.round(state.currentVolume)}
+                </span>
+              </div>
+            </div>
           </div>
         )}
 

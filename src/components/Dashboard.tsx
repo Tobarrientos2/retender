@@ -9,6 +9,7 @@ import { CreateSessions } from "./CreateSessions";
 import { SessionsList } from "./SessionsList";
 import { SessionCollectionsList } from "./SessionCollectionsList";
 import { RecordScreen } from "./RecordScreen";
+import { RecordingSettings } from "./RecordingSettings";
 
 interface SessionData {
   sessionId: number;
@@ -31,6 +32,7 @@ export function Dashboard() {
     | "sessions-list"
     | "collections"
     | "record-screen"
+    | "recording-settings"
   >("home");
   const [selectedSetId, setSelectedSetId] = useState<Id<"affirmationSets"> | null>(null);
   const [selectedCollectionId, setSelectedCollectionId] = useState<Id<"sessionCollections"> | null>(null);
@@ -125,6 +127,12 @@ export function Dashboard() {
     );
   }
 
+  if (currentView === "recording-settings") {
+    return (
+      <RecordingSettings onBack={() => setCurrentView("home")} />
+    );
+  }
+
   return (
     <div className="space-y-12">
       {/* Header */}
@@ -191,6 +199,19 @@ export function Dashboard() {
           <h3 className="text-lg font-medium text-purple-900 mb-2">Record Screen</h3>
           <p className="text-purple-700 text-sm">
             Graba tu pantalla y escucha el audio extraído de la grabación
+          </p>
+        </button>
+
+        <button
+          onClick={() => setCurrentView("recording-settings")}
+          className="group p-8 bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-lg hover:border-orange-300 transition-all duration-200 text-left"
+        >
+          <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mb-4 group-hover:bg-orange-200 transition-colors">
+            <span className="text-xl">⚙️</span>
+          </div>
+          <h3 className="text-lg font-medium text-orange-900 mb-2">Recording Settings</h3>
+          <p className="text-orange-700 text-sm">
+            Configura la detección de silencio y transcripción automática
           </p>
         </button>
 

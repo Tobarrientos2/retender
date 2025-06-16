@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
+import { useSilenceDetectionSettings } from './useRecordingSettings';
 
 export interface RecordingState {
   isRecording: boolean;
@@ -6,6 +7,10 @@ export interface RecordingState {
   duration: number;
   recordedBlob: Blob | null;
   error: string | null;
+  // Nuevos estados para detección de silencio
+  hasDetectedSound: boolean;
+  silenceCountdown: number;
+  currentVolume: number;
 }
 
 export interface UseScreenRecorderReturn {
@@ -18,12 +23,18 @@ export interface UseScreenRecorderReturn {
 }
 
 export function useScreenRecorder(): UseScreenRecorderReturn {
+  // Obtener configuraciones del usuario desde Convex
+  const silenceSettings = useSilenceDetectionSettings();
+
   const [state, setState] = useState<RecordingState>({
     isRecording: false,
     isPaused: false,
     duration: 0,
     recordedBlob: null,
     error: null,
+    hasDetectedSound: false,
+    silenceCountdown: 0,
+    currentVolume: 0,
   });
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -31,6 +42,15 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
   const chunksRef = useRef<Blob[]>([]);
   const startTimeRef = useRef<number>(0);
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const autoStopTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Referencias para detección de silencio
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const silenceDetectionRef = useRef<NodeJS.Timeout | null>(null);
+  const volumeCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const hasDetectedSoundRef = useRef<boolean>(false);
+  const silenceStartTimeRef = useRef<number | null>(null);
 
   const updateDuration = useCallback(() => {
     if (startTimeRef.current > 0) {
@@ -50,6 +70,139 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
       durationIntervalRef.current = null;
     }
   }, []);
+
+  const clearAutoStopTimer = useCallback(() => {
+    if (autoStopTimerRef.current) {
+      clearTimeout(autoStopTimerRef.current);
+      autoStopTimerRef.current = null;
+    }
+  }, []);
+
+  const clearSilenceDetection = useCallback(() => {
+    if (silenceDetectionRef.current) {
+      clearTimeout(silenceDetectionRef.current);
+      silenceDetectionRef.current = null;
+    }
+    if (volumeCheckIntervalRef.current) {
+      clearInterval(volumeCheckIntervalRef.current);
+      volumeCheckIntervalRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    analyserRef.current = null;
+  }, []);
+
+  const setupSilenceDetection = useCallback((stream: MediaStream) => {
+    const audioTracks = stream.getAudioTracks();
+    if (audioTracks.length === 0) {
+      console.warn('No hay pistas de audio para detectar silencio');
+      return;
+    }
+
+    try {
+      // Resetear refs
+      hasDetectedSoundRef.current = false;
+      silenceStartTimeRef.current = null;
+
+      // Crear contexto de audio
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioContext = audioContextRef.current;
+
+      // Crear analizador
+      analyserRef.current = audioContext.createAnalyser();
+      const analyser = analyserRef.current;
+      analyser.fftSize = 1024;
+      analyser.minDecibels = -90;
+      analyser.maxDecibels = -10;
+
+      // Crear fuente desde el stream
+      const source = audioContext.createMediaStreamSource(stream);
+      source.connect(analyser);
+
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      // Configuración de detección usando configuraciones del usuario
+      const SILENCE_THRESHOLD = silenceSettings.silenceThreshold;
+      const SOUND_THRESHOLD = silenceSettings.soundThreshold;
+      const SILENCE_DURATION = silenceSettings.silenceDuration; // Ya viene en milisegundos
+
+      console.log('🎧 Detección de silencio configurada con configuraciones personalizadas:', {
+        silenceDuration: SILENCE_DURATION / 1000 + 's',
+        soundThreshold: SOUND_THRESHOLD,
+        silenceThreshold: SILENCE_THRESHOLD
+      });
+
+      const checkVolume = () => {
+        if (!analyser) return;
+
+        analyser.getByteTimeDomainData(dataArray);
+
+        // Calcular volumen promedio
+        let sum = 0;
+        for (let i = 0; i < bufferLength; i++) {
+          const value = Math.abs(dataArray[i] - 128);
+          sum += value;
+        }
+        const averageVolume = sum / bufferLength;
+
+        setState(prev => ({ ...prev, currentVolume: averageVolume }));
+
+        // Detectar primer sonido usando ref
+        if (!hasDetectedSoundRef.current && averageVolume > SOUND_THRESHOLD) {
+          console.log('🔊 Primer sonido detectado! Iniciando monitoreo de silencio...');
+          hasDetectedSoundRef.current = true;
+          setState(prev => ({ ...prev, hasDetectedSound: true }));
+        }
+
+        // Solo monitorear silencio después del primer sonido
+        if (hasDetectedSoundRef.current) {
+          if (averageVolume < SILENCE_THRESHOLD) {
+            // Silencio detectado
+            if (silenceStartTimeRef.current === null) {
+              silenceStartTimeRef.current = Date.now();
+              console.log('🤫 Silencio detectado - iniciando countdown...');
+            }
+
+            const silenceElapsed = Date.now() - silenceStartTimeRef.current;
+            const remainingSeconds = Math.ceil((SILENCE_DURATION - silenceElapsed) / 1000);
+
+            setState(prev => ({
+              ...prev,
+              silenceCountdown: Math.max(0, remainingSeconds)
+            }));
+
+            if (silenceElapsed >= SILENCE_DURATION) {
+              console.log('⏰ Auto-stop: 3 segundos de silencio - deteniendo compartición');
+
+              // Detener todas las pistas del stream
+              if (streamRef.current) {
+                streamRef.current.getTracks().forEach(track => {
+                  track.stop();
+                });
+              }
+              return; // Salir del loop
+            }
+          } else {
+            // Sonido detectado - resetear contador de silencio
+            if (silenceStartTimeRef.current !== null) {
+              console.log('🔊 Sonido reanudado - reiniciando contador');
+              silenceStartTimeRef.current = null;
+              setState(prev => ({ ...prev, silenceCountdown: 0 }));
+            }
+          }
+        }
+      };
+
+      // Iniciar monitoreo cada 100ms
+      volumeCheckIntervalRef.current = setInterval(checkVolume, 100);
+
+    } catch (error) {
+      console.error('Error configurando detección de silencio:', error);
+    }
+  }, [silenceSettings]);
 
   const startRecording = useCallback(async () => {
     try {
@@ -119,6 +272,8 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 
       mediaRecorderRef.current.onerror = (event) => {
         console.error('MediaRecorder error:', event);
+        clearAutoStopTimer();
+        clearSilenceDetection();
         setState(prev => ({
           ...prev,
           error: 'Error durante la grabación',
@@ -131,14 +286,26 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
       // Manejar cuando el usuario detiene la compartición desde el navegador
       stream.getVideoTracks()[0].onended = () => {
         if (mediaRecorderRef.current && state.isRecording) {
+          clearAutoStopTimer();
+          clearSilenceDetection();
           stopRecording();
         }
       };
 
       // Iniciar grabación
       mediaRecorderRef.current.start(1000); // Chunk cada segundo
-      setState(prev => ({ ...prev, isRecording: true, duration: 0 }));
+      setState(prev => ({
+        ...prev,
+        isRecording: true,
+        duration: 0,
+        hasDetectedSound: false,
+        silenceCountdown: 0,
+        currentVolume: 0
+      }));
       startDurationTimer();
+
+      // Configurar detección de silencio inteligente
+      setupSilenceDetection(stream);
 
     } catch (error) {
       console.error('Error starting recording:', error);
@@ -148,12 +315,16 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
         isRecording: false
       }));
     }
-  }, [state.isRecording, startDurationTimer, stopDurationTimer]);
+  }, [state.isRecording, startDurationTimer, stopDurationTimer, clearAutoStopTimer, setupSilenceDetection]);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && state.isRecording) {
+      // Limpiar timers y detección de silencio
+      clearAutoStopTimer();
+      clearSilenceDetection();
+
       mediaRecorderRef.current.stop();
-      
+
       // Detener todas las pistas del stream
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => {
@@ -162,7 +333,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
         streamRef.current = null;
       }
     }
-  }, [state.isRecording]);
+  }, [state.isRecording, clearAutoStopTimer, clearSilenceDetection]);
 
   const pauseRecording = useCallback(() => {
     if (mediaRecorderRef.current && state.isRecording && !state.isPaused) {

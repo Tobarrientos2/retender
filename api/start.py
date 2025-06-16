@@ -12,7 +12,7 @@ def check_dependencies():
     """Verificar que las dependencias estén instaladas"""
     try:
         import fastapi
-        import whisper
+        import faster_whisper
         import ffmpeg
         print("✅ Dependencias principales encontradas")
         return True
