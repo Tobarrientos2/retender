@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(nvidia-smi:*)",
+      "Bash(system_profiler:*)",
+      "Bash(pip install:*)",
+      "Bash(lsof:*)",
+      "Bash(python:*)",
+      "Bash(curl:*)",
+      "Bash(unset http_proxy)",
+      "Bash(unset https_proxy)",
+      "Bash(env)",
+      "Bash(unset:*)",
+      "Bash(grep:*)",
+      "Bash(networksetup:*)",
+      "Bash(pkill:*)"
+    ],
+    "deny": []
+  }
+}

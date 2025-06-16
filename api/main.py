@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Optional, List
 import aiofiles
 
-from fastapi import FastAPI, File, UploadFile, HTTPException, Form, BackgroundTasks, Depends
+from fastapi import FastAPI, File, UploadFile, HTTPException, Form, BackgroundTasks, Depends, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -18,11 +18,15 @@ from loguru import logger
 
 from services.transcription_service import TranscriptionService
 from services.audio_processor import AudioProcessor
+from services.job_queue_service import job_queue_service
+from services.websocket_manager import websocket_manager
 from models.transcription_models import (
     TranscriptionResponse,
     TranscriptionRequest,
     HealthResponse,
-    ErrorResponse
+    ErrorResponse,
+    JobSubmissionResponse,
+    TranscriptionJob
 )
 # from utils.auth import verify_bearer_token
 
@@ -38,8 +42,8 @@ app = FastAPI(
 # Configuración CORS para desarrollo
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://localhost:5175"],
-    allow_credentials=True,
+    allow_origins=["*"],  # Permitir todos los orígenes en desarrollo
+    allow_credentials=False,  # Cambiar a False cuando allow_origins es "*"
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -56,13 +60,17 @@ logger.add("logs/api.log", rotation="1 day", retention="7 days", level="INFO")
 async def startup_event():
     """Inicializar servicios al arrancar la API"""
     logger.info("🚀 Iniciando Audio Transcription API")
-    
+
     # Crear directorio de logs si no existe
     os.makedirs("logs", exist_ok=True)
     os.makedirs("temp", exist_ok=True)
-    
+
     # Inicializar modelo Whisper
     await transcription_service.initialize()
+
+    # Inicializar job queue service
+    await job_queue_service.start()
+
     logger.info("✅ Servicios inicializados correctamente")
 
 
@@ -70,6 +78,11 @@ async def startup_event():
 async def shutdown_event():
     """Limpiar recursos al cerrar la API"""
     logger.info("🔄 Cerrando Audio Transcription API")
+
+    # Detener job queue service
+    await job_queue_service.stop()
+
+    # Limpiar transcription service
     await transcription_service.cleanup()
 
 
@@ -265,6 +278,162 @@ async def get_supported_languages():
             # Agregar más idiomas según necesidad
         ]
     }
+
+
+@app.post("/transcribe-job", response_model=JobSubmissionResponse)
+async def submit_transcription_job(
+    file: UploadFile = File(..., description="Archivo de audio a transcribir"),
+    language: Optional[str] = Form(default="auto", description="Idioma del audio (auto, es, en, fr, etc.)"),
+    model: Optional[str] = Form(default="medium", description="Modelo Whisper (tiny, base, small, medium, large)"),
+    return_timestamps: bool = Form(default=True, description="Incluir timestamps en la transcripción"),
+    temperature: float = Form(default=0.0, description="Temperatura para la transcripción (0.0-1.0)"),
+    initial_prompt: Optional[str] = Form(default=None, description="Prompt inicial para mejorar la transcripción")
+):
+    """
+    Enviar archivo de audio para transcripción en background
+
+    Retorna un job_id y WebSocket URL para seguir el progreso
+    """
+
+    # Validar archivo
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No se proporcionó archivo")
+
+    # Validar tamaño (25MB máximo)
+    max_size = 25 * 1024 * 1024  # 25MB
+    file_size = 0
+    temp_file_path = None
+
+    try:
+        # Crear archivo temporal
+        with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as temp_file:
+            temp_file_path = temp_file.name
+
+            # Leer archivo en chunks para validar tamaño
+            while chunk := await file.read(8192):  # 8KB chunks
+                file_size += len(chunk)
+                if file_size > max_size:
+                    os.unlink(temp_file_path)
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"Archivo demasiado grande. Máximo: {max_size // (1024*1024)}MB"
+                    )
+                temp_file.write(chunk)
+
+        logger.info(f"📁 Archivo recibido para job: {file.filename} ({file_size / (1024*1024):.2f}MB)")
+
+        # Procesar audio
+        processed_audio_path = await audio_processor.process_audio_file(temp_file_path)
+
+        # Crear request de transcripción
+        transcription_request = TranscriptionRequest(
+            audio_file_path=processed_audio_path,
+            language=language if language != "auto" else None,
+            model=model,
+            return_timestamps=return_timestamps,
+            temperature=temperature,
+            initial_prompt=initial_prompt
+        )
+
+        # Crear callback de progreso para WebSocket
+        async def progress_callback(job: TranscriptionJob):
+            await websocket_manager.broadcast_progress(job)
+
+            # Si está completado o falló, enviar mensaje final
+            if job.status.value in ["completed", "failed", "cancelled"]:
+                await websocket_manager.broadcast_completion(job)
+
+        # Enviar job a la cola
+        job_id = await job_queue_service.submit_job(
+            processed_audio_path,
+            transcription_request,
+            progress_callback
+        )
+
+        # Crear URL del WebSocket (usar puerto dinámico)
+        websocket_url = f"ws://localhost:9001/ws/transcription/{job_id}"
+
+        # Estimar tiempo de procesamiento (aproximado)
+        estimated_time = file_size / (1024 * 1024) * 30  # ~30 segundos por MB
+
+        # Obtener posición en cola
+        queue_info = await job_queue_service.get_queue_info()
+        queue_position = queue_info["queue_size"]
+
+        logger.info(f"✅ Job enviado: {job_id}")
+
+        return JobSubmissionResponse(
+            job_id=job_id,
+            status="queued",
+            websocket_url=websocket_url,
+            estimated_processing_time=estimated_time,
+            queue_position=queue_position
+        )
+
+    except HTTPException:
+        # Re-lanzar HTTPExceptions
+        if temp_file_path and os.path.exists(temp_file_path):
+            os.unlink(temp_file_path)
+        raise
+
+    except Exception as e:
+        # Limpiar archivos en caso de error
+        if temp_file_path and os.path.exists(temp_file_path):
+            os.unlink(temp_file_path)
+
+        logger.error(f"❌ Error enviando job para {file.filename}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error interno del servidor: {str(e)}"
+        )
+
+
+@app.get("/job/{job_id}", response_model=TranscriptionJob)
+async def get_job_status(job_id: str):
+    """Obtener estado de un job de transcripción"""
+    job = await job_queue_service.get_job_status(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job no encontrado")
+    return job
+
+
+@app.delete("/job/{job_id}")
+async def cancel_job(job_id: str):
+    """Cancelar un job de transcripción"""
+    success = await job_queue_service.cancel_job(job_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Job no encontrado")
+    return {"message": "Job cancelado exitosamente"}
+
+
+@app.get("/queue/info")
+async def get_queue_info():
+    """Obtener información de la cola de jobs"""
+    queue_info = await job_queue_service.get_queue_info()
+    websocket_stats = websocket_manager.get_connection_stats()
+
+    return {
+        "queue": queue_info,
+        "websockets": websocket_stats
+    }
+
+
+@app.websocket("/ws/transcription/{job_id}")
+async def websocket_transcription_endpoint(websocket: WebSocket, job_id: str):
+    """WebSocket endpoint para seguir progreso de transcripción"""
+    await websocket_manager.connect(websocket, job_id)
+
+    try:
+        while True:
+            # Recibir mensajes del cliente
+            data = await websocket.receive_text()
+            await websocket_manager.handle_websocket_message(websocket, data)
+
+    except WebSocketDisconnect:
+        await websocket_manager.disconnect(websocket)
+    except Exception as e:
+        logger.error(f"❌ Error en WebSocket {job_id}: {e}")
+        await websocket_manager.disconnect(websocket)
 
 
 async def cleanup_temp_files(file_paths: List[str]):

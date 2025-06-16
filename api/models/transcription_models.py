@@ -5,6 +5,7 @@ Modelos de datos para la API de transcripción
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 from datetime import datetime
+from enum import Enum
 
 
 class TranscriptionRequest(BaseModel):
@@ -111,6 +112,49 @@ class BatchTranscriptionResponse(BaseModel):
     results: List[TranscriptionResponse] = Field(..., description="Resultados individuales")
     total_processing_time: float = Field(..., description="Tiempo total de procesamiento")
     timestamp: datetime = Field(default_factory=datetime.now, description="Timestamp del lote")
+
+
+class JobStatus(str, Enum):
+    """Estados posibles de un job de transcripción"""
+    PENDING = "pending"
+    QUEUED = "queued"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class TranscriptionJob(BaseModel):
+    """Modelo para job de transcripción en background"""
+    job_id: str = Field(..., description="ID único del job")
+    status: JobStatus = Field(default=JobStatus.PENDING, description="Estado del job")
+    progress: float = Field(default=0.0, ge=0.0, le=100.0, description="Progreso en porcentaje")
+    message: str = Field(default="Job creado", description="Mensaje de estado")
+    audio_file_path: str = Field(..., description="Ruta del archivo de audio")
+    request_params: TranscriptionRequest = Field(..., description="Parámetros de transcripción")
+    result: Optional[TranscriptionResponse] = Field(None, description="Resultado de la transcripción")
+    error: Optional[str] = Field(None, description="Error si el job falló")
+    created_at: datetime = Field(default_factory=datetime.now, description="Timestamp de creación")
+    started_at: Optional[datetime] = Field(None, description="Timestamp de inicio")
+    completed_at: Optional[datetime] = Field(None, description="Timestamp de finalización")
+    estimated_time_remaining: Optional[float] = Field(None, description="Tiempo estimado restante en segundos")
+
+
+class JobSubmissionResponse(BaseModel):
+    """Respuesta al enviar un job de transcripción"""
+    job_id: str = Field(..., description="ID único del job")
+    status: JobStatus = Field(..., description="Estado inicial del job")
+    websocket_url: str = Field(..., description="URL del WebSocket para seguir el progreso")
+    estimated_processing_time: Optional[float] = Field(None, description="Tiempo estimado de procesamiento")
+    queue_position: Optional[int] = Field(None, description="Posición en la cola")
+
+
+class WebSocketMessage(BaseModel):
+    """Mensaje de WebSocket para updates de progreso"""
+    type: str = Field(..., description="Tipo de mensaje (progress, completed, error)")
+    job_id: str = Field(..., description="ID del job")
+    data: Dict[str, Any] = Field(..., description="Datos del mensaje")
+    timestamp: datetime = Field(default_factory=datetime.now, description="Timestamp del mensaje")
 
 
 class TranscriptionProgress(BaseModel):

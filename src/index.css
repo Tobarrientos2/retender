@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Animaciones personalizadas para componentes de transcripción */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+}
+
 :root {
   --color-light: #fafafa;
   --color-dark: #171717;

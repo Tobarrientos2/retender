@@ -5,7 +5,7 @@ Servicio de transcripción usando OpenAI Whisper
 import os
 import time
 import asyncio
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Callable
 from pathlib import Path
 
 from faster_whisper import WhisperModel
@@ -33,8 +33,8 @@ class TranscriptionService:
         """Inicializar el servicio de transcripción"""
         logger.info("🔄 Inicializando servicio de transcripción...")
         
-        # Cargar modelo base por defecto
-        await self.load_model("base")
+        # Cargar modelo medium por defecto (upgrade de base)
+        await self.load_model("medium")
         
         logger.info("✅ Servicio de transcripción inicializado")
     
@@ -241,14 +241,152 @@ class TranscriptionService:
             logger.error(f"❌ Health check falló: {e}")
             return False
     
+    async def transcribe_with_progress(
+        self,
+        request: TranscriptionRequest,
+        progress_callback: Optional[Callable] = None
+    ) -> TranscriptionResponse:
+        """
+        Transcribir audio con callbacks de progreso
+        """
+        try:
+            start_time = time.time()
+
+            # Callback de progreso inicial
+            if progress_callback:
+                await progress_callback(0.0, "Iniciando transcripción...")
+
+            # Cargar modelo si es necesario
+            model_loaded = await self.load_model(request.model)
+            if not model_loaded:
+                raise Exception(f"No se pudo cargar el modelo: {request.model}")
+
+            if progress_callback:
+                await progress_callback(10.0, "Modelo cargado")
+
+            # Obtener modelo
+            model = self.models[request.model]
+
+            if progress_callback:
+                await progress_callback(20.0, "Procesando audio...")
+
+            # Obtener información del audio
+            audio_info = await self._get_audio_info(request.audio_file_path)
+
+            if progress_callback:
+                await progress_callback(30.0, "Información de audio obtenida")
+
+            # Transcribir con progreso
+            transcription_result = await self._transcribe_faster_whisper_with_progress(
+                model, request, progress_callback
+            )
+
+            if progress_callback:
+                await progress_callback(90.0, "Finalizando transcripción...")
+
+            processing_time = time.time() - start_time
+
+            # Crear respuesta
+            response = TranscriptionResponse(
+                text=transcription_result["text"],
+                language=transcription_result["language"],
+                model_used=request.model,
+                segments=transcription_result["segments"],
+                audio_info=audio_info,
+                processing_time=processing_time,
+                config={
+                    "model": request.model,
+                    "language": request.language or "auto",
+                    "return_timestamps": request.return_timestamps,
+                    "temperature": request.temperature,
+                    "initial_prompt": request.initial_prompt
+                }
+            )
+
+            if progress_callback:
+                await progress_callback(100.0, "Transcripción completada")
+
+            logger.info(f"✅ Transcripción con progreso completada en {processing_time:.2f}s")
+            return response
+
+        except Exception as e:
+            if progress_callback:
+                await progress_callback(0.0, f"Error: {str(e)}")
+            logger.error(f"❌ Error en transcripción con progreso: {e}")
+            raise Exception(f"Error en transcripción: {str(e)}")
+
+    async def _transcribe_faster_whisper_with_progress(
+        self,
+        model: WhisperModel,
+        request: TranscriptionRequest,
+        progress_callback: Optional[Callable] = None
+    ) -> Dict[str, Any]:
+        """Transcribir usando faster-whisper con callbacks de progreso"""
+
+        # Configurar parámetros
+        transcribe_params = {
+            "language": request.language,
+            "temperature": request.temperature,
+            "initial_prompt": request.initial_prompt,
+        }
+
+        # Remover parámetros None
+        transcribe_params = {k: v for k, v in transcribe_params.items() if v is not None}
+
+        if progress_callback:
+            await progress_callback(40.0, "Iniciando transcripción del modelo...")
+
+        # Transcribir (faster-whisper no tiene callbacks nativos, simulamos progreso)
+        segments, info = model.transcribe(
+            request.audio_file_path,
+            **transcribe_params
+        )
+
+        # Procesar resultados con progreso simulado
+        text_segments = []
+        full_text = ""
+
+        # Convertir generator a lista para poder calcular progreso
+        segments_list = list(segments)
+        total_segments = len(segments_list)
+
+        for i, segment in enumerate(segments_list):
+            # Calcular progreso (40% - 80%)
+            segment_progress = 40.0 + ((i + 1) / total_segments) * 40.0
+
+            if progress_callback and i % 5 == 0:  # Actualizar cada 5 segmentos
+                await progress_callback(
+                    segment_progress,
+                    f"Procesando segmento {i + 1}/{total_segments}"
+                )
+
+            segment_data = TranscriptionSegment(
+                id=i,
+                start=segment.start,
+                end=segment.end,
+                text=segment.text.strip(),
+                confidence=getattr(segment, 'avg_logprob', None)
+            )
+            text_segments.append(segment_data)
+            full_text += segment.text.strip() + " "
+
+        if progress_callback:
+            await progress_callback(80.0, "Transcripción del modelo completada")
+
+        return {
+            "text": full_text.strip(),
+            "language": info.language,
+            "segments": text_segments if request.return_timestamps else []
+        }
+
     async def cleanup(self):
         """Limpiar recursos"""
         logger.info("🔄 Limpiando recursos del servicio de transcripción")
-        
+
         # Limpiar modelos cargados
         self.models.clear()
         self.current_model_name = None
-        
+
         logger.info("✅ Recursos limpiados")
     
     def get_loaded_models(self) -> list:

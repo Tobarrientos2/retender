@@ -8,7 +8,7 @@ UV_HTTP_TIMEOUT = "600"
 
 # Configuración para usar modelo local únicamente
 USE_OPENAI_API = "false"
-MODEL_SIZE = "base"
+MODEL_SIZE = "medium"
 DEVICE = "cpu"
 COMPUTE_TYPE = "int8"
 
