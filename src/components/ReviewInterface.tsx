@@ -26,12 +26,45 @@ interface ReviewInterfaceProps {
 }
 
 type ViewMode = "review" | "practice";
-type PracticeMode = "loading" | "question" | "result";
+type PracticeMode = "loading" | "question" | "validated";
 
 interface AntiAffirmation {
   content: string;
   order: number;
   errorType: string;
+}
+
+// Función para comparar textos palabra por palabra y mostrar diferencias
+function compareTexts(correctText: string, incorrectText: string) {
+  const correctWords = correctText.split(' ');
+  const incorrectWords = incorrectText.split(' ');
+  const maxLength = Math.max(correctWords.length, incorrectWords.length);
+
+  const result = [];
+
+  for (let i = 0; i < maxLength; i++) {
+    const correctWord = correctWords[i] || '';
+    const incorrectWord = incorrectWords[i] || '';
+
+    if (correctWord !== incorrectWord) {
+      // Hay diferencia - mostrar palabra correcta arriba y incorrecta tachada
+      result.push({
+        type: 'different',
+        correct: correctWord,
+        incorrect: incorrectWord,
+        index: i
+      });
+    } else {
+      // Son iguales - mostrar solo la palabra normal
+      result.push({
+        type: 'same',
+        word: correctWord,
+        index: i
+      });
+    }
+  }
+
+  return result;
 }
 
 export function ReviewInterface({ setId, sessionData, collectionId, sessionId, onBack }: ReviewInterfaceProps) {
@@ -40,9 +73,8 @@ export function ReviewInterface({ setId, sessionData, collectionId, sessionId, o
   const [practiceMode, setPracticeMode] = useState<PracticeMode>("loading");
   const [antiAffirmations, setAntiAffirmations] = useState<AntiAffirmation[]>([]);
   const [currentPracticeIndex, setCurrentPracticeIndex] = useState(0);
-  const [userChoice, setUserChoice] = useState<"correct" | "incorrect" | null>(null);
-  const [score, setScore] = useState({ correct: 0, total: 0 });
-  const [showingCorrect, setShowingCorrect] = useState(true);
+  const [isValidated, setIsValidated] = useState(false);
+  const [editableText, setEditableText] = useState("");
 
   // Conditional data fetching
   const setData = useQuery(
@@ -100,7 +132,8 @@ export function ReviewInterface({ setId, sessionData, collectionId, sessionId, o
 
       setAntiAffirmations(antiAffs);
       setCurrentPracticeIndex(0);
-      setScore({ correct: 0, total: 0 });
+      setIsValidated(false);
+      setEditableText(antiAffs[0]?.content || "");
       setPracticeMode("question");
     } catch (error) {
       console.error("Error generating anti-affirmations:", error);
@@ -108,37 +141,28 @@ export function ReviewInterface({ setId, sessionData, collectionId, sessionId, o
     }
   };
 
-  const handlePracticeChoice = (choice: "correct" | "incorrect") => {
-    setUserChoice(choice);
-    setPracticeMode("result");
-
-    const isCorrect = (choice === "correct" && showingCorrect) ||
-                     (choice === "incorrect" && !showingCorrect);
-
-    if (isCorrect) {
-      setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }));
-    } else {
-      setScore(prev => ({ ...prev, total: prev.total + 1 }));
-    }
+  const handleValidate = () => {
+    setIsValidated(true);
+    setPracticeMode("validated");
   };
 
   const nextPracticeQuestion = () => {
     if (currentPracticeIndex < affirmations.length - 1) {
-      setCurrentPracticeIndex(prev => prev + 1);
-      setUserChoice(null);
-      setShowingCorrect(Math.random() > 0.5); // Randomly show correct or incorrect
+      const nextIndex = currentPracticeIndex + 1;
+      setCurrentPracticeIndex(nextIndex);
+      setIsValidated(false);
+      setEditableText(antiAffirmations[nextIndex]?.content || "");
       setPracticeMode("question");
     } else {
       // Practice completed
-      setPracticeMode("result");
+      setPracticeMode("validated");
     }
   };
 
   const resetPractice = () => {
     setCurrentPracticeIndex(0);
-    setUserChoice(null);
-    setScore({ correct: 0, total: 0 });
-    setShowingCorrect(true);
+    setIsValidated(false);
+    setEditableText(antiAffirmations[0]?.content || "");
     setPracticeMode("question");
   };
 
@@ -180,11 +204,9 @@ export function ReviewInterface({ setId, sessionData, collectionId, sessionId, o
 
     const currentOriginal = affirmations[currentPracticeIndex];
     const currentAnti = antiAffirmations[currentPracticeIndex];
-    const displayAffirmation = showingCorrect ? currentOriginal : currentAnti;
     const isCompleted = currentPracticeIndex >= affirmations.length;
 
     if (isCompleted) {
-      const percentage = Math.round((score.correct / score.total) * 100);
       return (
         <div className="max-w-4xl mx-auto">
           <div className="text-center py-16">
@@ -193,7 +215,7 @@ export function ReviewInterface({ setId, sessionData, collectionId, sessionId, o
             </div>
             <h3 className="text-2xl font-medium text-gray-900 mb-2">Practice Complete!</h3>
             <p className="text-gray-600 mb-6">
-              You scored {score.correct} out of {score.total} ({percentage}%)
+              Has completado todas las afirmaciones de práctica.
             </p>
             <div className="flex gap-4 justify-center">
               <button
@@ -227,15 +249,12 @@ export function ReviewInterface({ setId, sessionData, collectionId, sessionId, o
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-2xl font-light text-gray-900 mb-1">Practice Mode</h2>
-              <p className="text-gray-600">Is this affirmation correct or incorrect?</p>
+              <p className="text-gray-600">Corrige la afirmación editando el texto y luego valida tu respuesta</p>
             </div>
             <div className="text-right">
               <span className="text-sm text-gray-600">
                 Question {currentPracticeIndex + 1} of {affirmations.length}
               </span>
-              <div className="text-sm text-gray-600">
-                Score: {score.correct}/{score.total}
-              </div>
             </div>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2 mt-4">
@@ -248,36 +267,44 @@ export function ReviewInterface({ setId, sessionData, collectionId, sessionId, o
 
         {/* Practice Question */}
         <div className="bg-white border border-gray-200 rounded-lg p-12 mb-8 text-center min-h-[300px] flex items-center justify-center">
-          <div>
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <span className="text-2xl">🎯</span>
-            </div>
-            <p className="text-xl leading-relaxed text-gray-900 max-w-2xl">
-              {displayAffirmation?.content}
-            </p>
-            {practiceMode === "result" && (
-              <div className="mt-6">
-                <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg ${
-                  (userChoice === "correct" && showingCorrect) || (userChoice === "incorrect" && !showingCorrect)
-                    ? 'bg-green-100 text-green-800'
-                    : 'bg-red-100 text-red-800'
-                }`}>
-                  <span>{
-                    (userChoice === "correct" && showingCorrect) || (userChoice === "incorrect" && !showingCorrect)
-                      ? '✅ Correct!'
-                      : '❌ Incorrect'
-                  }</span>
+          <div className="w-full">
+            {practiceMode === "validated" && isValidated ? (
+              /* Mostrar comparación palabra por palabra */
+              <div>
+                <p className="text-lg font-medium text-black mb-4">Afirmación incorrecta:</p>
+                <div className="text-xl leading-relaxed text-gray-900 max-w-2xl mx-auto" style={{ lineHeight: '2.4' }}>
+                  {compareTexts(currentOriginal?.content || '', editableText).map((item, index) => (
+                    <span key={index} className="inline-block mr-1">
+                      {item.type === 'different' ? (
+                        <span className="relative inline-block">
+                          {/* Palabra correcta arriba - perfectamente centrada y más cerca */}
+                          <span className="absolute -top-3 left-1/2 transform -translate-x-1/2 text-base text-green-700 whitespace-nowrap">
+                            {item.correct}
+                          </span>
+                          {/* Palabra incorrecta tachada - sutil */}
+                          <span className="line-through text-gray-500">
+                            {item.incorrect}
+                          </span>
+                        </span>
+                      ) : (
+                        /* Palabra igual - normal */
+                        <span className="mr-1">{item.word}</span>
+                      )}
+                    </span>
+                  ))}
                 </div>
-                {!showingCorrect && (
-                  <div className="mt-4 p-4 bg-yellow-50 rounded-lg">
-                    <p className="text-sm text-yellow-800 mb-2">
-                      <strong>Error:</strong> {currentAnti?.errorType}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      <strong>Correct version:</strong> {currentOriginal?.content}
-                    </p>
-                  </div>
-                )}
+              </div>
+            ) : (
+              /* Campo de texto editable para corregir la afirmación */
+              <div>
+                <p className="text-lg font-medium text-black mb-4">Corrige la afirmación incorrecta:</p>
+                <textarea
+                  value={editableText}
+                  onChange={(e) => setEditableText(e.target.value)}
+                  className="w-full max-w-2xl mx-auto p-4 text-xl leading-relaxed text-black border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  rows={4}
+                  placeholder="Edita el texto para corregir la afirmación..."
+                />
               </div>
             )}
           </div>
@@ -285,27 +312,21 @@ export function ReviewInterface({ setId, sessionData, collectionId, sessionId, o
 
         {/* Practice Controls */}
         {practiceMode === "question" ? (
-          <div className="flex justify-center gap-4">
+          <div className="flex justify-center">
             <button
-              onClick={() => handlePracticeChoice("correct")}
-              className="px-8 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+              onClick={handleValidate}
+              className="px-8 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
             >
-              ✅ Correct
-            </button>
-            <button
-              onClick={() => handlePracticeChoice("incorrect")}
-              className="px-8 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-            >
-              ❌ Incorrect
+              🔍 Validar
             </button>
           </div>
         ) : (
           <div className="flex justify-center">
             <button
               onClick={nextPracticeQuestion}
-              className="px-8 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+              className="px-8 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
             >
-              Next Question →
+              {currentPracticeIndex < affirmations.length - 1 ? 'Siguiente →' : 'Finalizar'}
             </button>
           </div>
         )}
