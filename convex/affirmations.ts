@@ -170,6 +170,11 @@ NOTA: Genera todas las afirmaciones en español, independientemente del idioma d
       content: contentWithLanguageContext,
     });
 
+    // Check if AI determined content is not valuable enough
+    if (affirmations.length === 0) {
+      throw new Error("La IA determinó que el contenido no contiene información suficientemente valiosa para generar afirmaciones de estudio. Intenta con contenido más específico y técnico.");
+    }
+
     // Create the set with transcription-specific metadata
     const title = args.title || `Afirmaciones de Audio - ${new Date().toLocaleDateString()}`;
 

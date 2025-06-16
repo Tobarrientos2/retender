@@ -150,81 +150,138 @@ function detectContentType(content: string): 'programming' | 'general' {
   return isProgramming ? 'programming' : 'general';
 }
 
-// Function to generate specialized prompts
-function generatePrompt(content: string, contentType: 'programming' | 'general'): string {
+// Function to generate intelligent filtered prompts
+function generateIntelligentPrompt(content: string, contentType: 'programming' | 'general'): string {
   const baseInstructions = `
-You must carefully analyze the following content and create exactly 3 powerful, insightful affirmations that are SPECIFICALLY about the material provided.
+ANÁLISIS INTELIGENTE DE CONTENIDO EDUCATIVO
 
-IMPORTANT LANGUAGE REQUIREMENT: Generate ALL affirmations in SPANISH (español). Do not use English.
-
-IMPORTANT: Your affirmations must be based on the SPECIFIC details, facts, concepts, and information contained in the content below. Do NOT create generic statements.
-
-Content to analyze:
+Contenido a analizar:
 ${content}
 
-REQUIREMENTS:
-- Generate ALL affirmations in SPANISH language
-- Read and understand the ENTIRE content above
-- Extract SPECIFIC facts, concepts, names, dates, places, or technical details
-- Create affirmations that demonstrate you understood the specific content
-- Include specific terminology, names, or concepts from the material
-- Avoid generic statements that could apply to any content
-- Use proper Spanish grammar and vocabulary
+MISIÓN: Identificar y extraer ÚNICAMENTE información valiosa que vale la pena memorizar.
 
-Respond with a JSON array of exactly 3 affirmations in this exact format:
-[
-  {
-    "content": "Primera afirmación con detalles ESPECÍFICOS del contenido",
-    "order": 1
-  },
-  {
-    "content": "Segunda afirmación con detalles ESPECÍFICOS del contenido",
-    "order": 2
-  },
-  {
-    "content": "Tercera afirmación con detalles ESPECÍFICOS del contenido",
-    "order": 3
-  }
-]
+CRITERIOS DE FILTRADO INTELIGENTE:
 
-Only return the JSON array, no other text.`;
+✅ SÍ GENERAR AFIRMACIONES PARA:
+- Datos específicos, números, porcentajes, estadísticas
+- Procesos técnicos no obvios
+- Mejores prácticas específicas
+- Información que se puede olvidar fácilmente
+- Conocimiento especializado del tema
+- Detalles técnicos importantes
+- Configuraciones específicas
+- Fórmulas, cálculos, métricas
+- Fechas, nombres específicos, eventos importantes
+
+❌ NO GENERAR AFIRMACIONES PARA:
+- Conocimiento general obvio
+- Información que "todo el mundo sabe"
+- Conceptos básicos universales
+- Pasos obvios o lógicos
+- Información superficial
+- Generalidades sin valor específico
+- Consejos de sentido común
+- Saludos, conversaciones casuales
+
+PROCESO DE ANÁLISIS:
+1. Lee todo el contenido cuidadosamente
+2. Identifica información ESPECÍFICA y TÉCNICA
+3. Filtra conocimiento obvio o general
+4. Evalúa si cada dato es "memorizable" vs "obvio"
+5. Decide cuántos grupos generar (0-4) basándose en contenido valioso
+
+IMPORTANTE: Genera TODAS las afirmaciones en ESPAÑOL (español). No uses inglés.`;
 
   if (contentType === 'programming') {
     return `${baseInstructions}
 
-PROGRAMMING CONTENT RULES (EN ESPAÑOL):
-- Cada afirmación debe tener máximo 15 palabras para la declaración principal
-- Puedes agregar hasta 30 palabras adicionales de sintaxis/ejemplos de código después de la declaración principal
-- Incluye fragmentos de código ESPECÍFICOS, nombres de funciones o ejemplos de sintaxis DEL CONTENIDO
-- Enfócate en los conceptos de programación ESPECÍFICOS, librerías o tecnologías mencionadas
-- Usa la terminología técnica EXACTA del contenido proporcionado
-- Escribe en lenguaje OBJETIVO, TERCERA PERSONA (NO declaraciones con "Yo")
-- Formato: "Concepto específico del contenido (máx 15 palabras) + ejemplo de código relevante (máx 30 palabras)"
+REGLAS ESPECÍFICAS PARA CONTENIDO DE PROGRAMACIÓN:
 
-EJEMPLOS de afirmaciones de programación ESPECÍFICAS en ESPAÑOL:
-- "React useState hook gestiona el estado del componente eficientemente. const [count, setCount] = useState(0) inicializa variables de estado."
-- "Express middleware procesa solicitudes secuencialmente. app.use((req, res, next) => { next(); }) habilita el manejo de solicitudes."
+✅ MEMORIZABLE en programación:
+- Sintaxis específica de funciones, métodos, APIs
+- Configuraciones técnicas no obvias
+- Parámetros específicos y sus valores
+- Mejores prácticas técnicas específicas
+- Versiones, compatibilidades, limitaciones
+- Algoritmos, complejidades, optimizaciones
+- Errores comunes y sus soluciones específicas
 
-EVITA declaraciones genéricas de programación - usa detalles ESPECÍFICOS del contenido proporcionado.`;
+❌ OBVIO en programación:
+- "Necesitas instalar Node.js" (obvio)
+- "Guarda el archivo" (obvio)
+- "Usa un editor de código" (obvio)
+- "Es importante comentar el código" (general)
+
+EJEMPLOS DE FILTRADO EN PROGRAMACIÓN:
+
+Contenido: "Instala Node.js. React useState retorna array con [state, setState]. Guarda el archivo como .jsx"
+✅ Memorizable: "React useState retorna un array con [state, setState] para manejar estado local"
+❌ Obvio: "Instala Node.js", "Guarda el archivo como .jsx"
+
+FORMATO: Cada afirmación debe incluir sintaxis específica cuando sea relevante.`;
   } else {
     return `${baseInstructions}
 
-GENERAL CONTENT RULES (EN ESPAÑOL):
-- Cada afirmación debe tener máximo 15 palabras
-- Sé conciso, impactante y memorable
-- Incluye nombres ESPECÍFICOS, fechas, lugares o hechos DEL CONTENIDO
-- Usa terminología EXACTA y nombres propios del material proporcionado
-- Escribe en lenguaje OBJETIVO, TERCERA PERSONA (NO declaraciones con "Yo")
-- Enfócate en las ideas ESPECÍFICAS, hechos y principios mencionados en el contenido
-- No se necesita código o sintaxis técnica
+REGLAS ESPECÍFICAS PARA CONTENIDO GENERAL:
 
-EJEMPLOS de afirmaciones generales ESPECÍFICAS en ESPAÑOL:
-- "Chile se extiende 4,300 kilómetros de norte a sur, siendo el país más largo del mundo."
-- "La Revolución Francesa comenzó en 1789 con la crisis financiera y la convocatoria de los Estados Generales."
-- "Santiago sirve como la capital de Chile y la ciudad más poblada de Sudamérica."
+✅ MEMORIZABLE en contenido general:
+- Estadísticas específicas, porcentajes, números exactos
+- Fechas importantes, años específicos
+- Nombres propios, lugares específicos
+- Procesos con pasos técnicos específicos
+- Métricas, KPIs, resultados medibles
+- Fórmulas, cálculos, conversiones
+- Datos de investigación, estudios específicos
+- Configuraciones, ajustes técnicos
 
-EVITA declaraciones genéricas - usa detalles ESPECÍFICOS, nombres, fechas y hechos del contenido proporcionado.`;
+❌ OBVIO en contenido general:
+- "Es importante tener una buena estrategia" (general)
+- "Necesitas una cuenta de email" (obvio)
+- "Google es un motor de búsqueda" (obvio)
+- "Es bueno hacer ejercicio" (sentido común)
+
+EJEMPLOS DE FILTRADO EN CONTENIDO GENERAL:
+
+Contenido: "Para Google Ads necesitas Gmail. El CTR promedio en seguros es 2.47%. Es importante tener buen contenido."
+✅ Memorizable: "El CTR promedio en la industria de seguros es 2.47% en Google Ads"
+❌ Obvio: "Necesitas Gmail para Google Ads", "Es importante tener buen contenido"
+
+Contenido: "Hola, ¿cómo estás? Hoy vamos a hablar de marketing digital."
+✅ Genera 0 grupos (sin información específica memorizable)
+
+FORMATO DE RESPUESTA JSON:
+{
+  "analysis": {
+    "totalContent": "Resumen breve del contenido analizado",
+    "valuableInfo": ["Lista de información específica encontrada"],
+    "filteredOut": ["Lista de información obvia que se filtró"],
+    "educationalValue": "high|medium|low|none",
+    "recommendedGroups": 0,
+    "reasoning": "Explicación de por qué esta cantidad de grupos"
+  },
+  "groups": [
+    {
+      "theme": "Tema específico con datos memorizables",
+      "affirmations": [
+        {"content": "Afirmación con dato específico memorizable en español", "order": 1},
+        {"content": "Afirmación con información técnica valiosa en español", "order": 2},
+        {"content": "Afirmación con detalle que se puede olvidar en español", "order": 3}
+      ]
+    }
+  ]
+}
+
+IMPORTANTE:
+- Si no hay información valiosa, genera 0 grupos con array vacío
+- Sé ESTRICTO con el filtrado - mejor pocos datos valiosos que muchos obvios
+- Cada grupo debe tener exactamente 3 afirmaciones
+- Solo devuelve el JSON, sin texto adicional`;
   }
+}
+
+// Legacy function name for compatibility
+function generatePrompt(content: string, contentType: 'programming' | 'general'): string {
+  return generateIntelligentPrompt(content, contentType);
 }
 
 export const generateAffirmations = internalAction({
@@ -237,9 +294,9 @@ export const generateAffirmations = internalAction({
       throw new Error("GEMINI_API_KEY environment variable is required");
     }
 
-    // Detect content type and generate appropriate prompt
+    // Detect content type and generate intelligent prompt
     const contentType = detectContentType(args.content);
-    const prompt = generatePrompt(args.content, contentType);
+    const prompt = generateIntelligentPrompt(args.content, contentType);
 
     try {
       const response = await fetch(
@@ -280,29 +337,66 @@ export const generateAffirmations = internalAction({
         throw new Error("No response from Gemini API");
       }
 
-      // Extract JSON from the response
-      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      // Extract JSON from the response (try both array and object formats)
+      let jsonMatch = text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
-        throw new Error("Could not extract JSON from response");
-      }
-
-      const affirmations = JSON.parse(jsonMatch[0]);
-
-      // Validate the structure
-      if (!Array.isArray(affirmations) || affirmations.length !== 3) {
-        throw new Error("Must generate exactly 3 affirmations");
-      }
-
-      for (const affirmation of affirmations) {
-        if (!affirmation.content || !affirmation.order ||
-            typeof affirmation.content !== 'string' ||
-            typeof affirmation.order !== 'number' ||
-            affirmation.order < 1 || affirmation.order > 3) {
-          throw new Error("Invalid affirmation structure");
+        // Fallback to array format for backward compatibility
+        jsonMatch = text.match(/\[[\s\S]*\]/);
+        if (!jsonMatch) {
+          throw new Error("Could not extract JSON from response");
         }
       }
 
-      return affirmations;
+      const parsedResponse = JSON.parse(jsonMatch[0]);
+
+      // Handle new intelligent format
+      if (parsedResponse.analysis && parsedResponse.groups) {
+        console.log('🧠 Análisis inteligente:', parsedResponse.analysis);
+
+        // If no groups generated (content not valuable enough)
+        if (parsedResponse.groups.length === 0) {
+          console.log('❌ No se generaron afirmaciones - contenido sin valor educativo suficiente');
+          return [];
+        }
+
+        // Flatten all affirmations from all groups
+        const allAffirmations: Array<{ content: string; order: number }> = [];
+        let globalOrder = 1;
+
+        for (const group of parsedResponse.groups) {
+          if (group.affirmations && Array.isArray(group.affirmations)) {
+            for (const affirmation of group.affirmations) {
+              allAffirmations.push({
+                content: affirmation.content,
+                order: globalOrder++
+              });
+            }
+          }
+        }
+
+        console.log(`✅ Generadas ${allAffirmations.length} afirmaciones de ${parsedResponse.groups.length} grupos temáticos`);
+        return allAffirmations;
+      }
+
+      // Handle legacy format (array of 3 affirmations)
+      if (Array.isArray(parsedResponse)) {
+        if (parsedResponse.length !== 3) {
+          throw new Error("Must generate exactly 3 affirmations in legacy format");
+        }
+
+        for (const affirmation of parsedResponse) {
+          if (!affirmation.content || !affirmation.order ||
+              typeof affirmation.content !== 'string' ||
+              typeof affirmation.order !== 'number' ||
+              affirmation.order < 1 || affirmation.order > 3) {
+            throw new Error("Invalid affirmation structure");
+          }
+        }
+
+        return parsedResponse;
+      }
+
+      throw new Error("Invalid response format - expected intelligent format or legacy array");
     } catch (error) {
       console.error("Error generating affirmations:", error);
       const message = error instanceof Error ? error.message : "Unknown error";
