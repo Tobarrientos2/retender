@@ -162,7 +162,7 @@ export class AudioExtractor {
     videoBlob: Blob,
     onProgress?: (progress: AudioExtractionProgress) => void
   ): Promise<AudioExtractionResult> {
-    return new Promise(async (resolve, reject) => {
+    return new Promise((resolve, reject) => {
       try {
         onProgress?.({
           stage: 'loading',
@@ -170,46 +170,329 @@ export class AudioExtractor {
           message: 'Cargando archivo...'
         });
 
-        // Convertir blob a ArrayBuffer
-        const arrayBuffer = await videoBlob.arrayBuffer();
-        
+        const video = document.createElement('video');
+        video.src = URL.createObjectURL(videoBlob);
+        video.muted = false; // Importante: NO silenciar para poder capturar audio
+        video.preload = 'metadata';
+
+        // Primer intento: esperar a que cargue metadata
+        video.onloadedmetadata = async () => {
+          try {
+            const duration = video.duration;
+            
+            console.log('Video metadata cargada:', {
+              duration,
+              readyState: video.readyState,
+              videoWidth: video.videoWidth,
+              videoHeight: video.videoHeight,
+              hasAudio: video.mozHasAudio !== undefined ? video.mozHasAudio : 'unknown'
+            });
+            
+            // Si la duración no es válida, intentar obtenerla de otra manera
+            let finalDuration = duration;
+            if (!isFinite(duration) || duration <= 0) {
+              console.warn('Duración inválida detectada, intentando método alternativo...');
+              
+              // Intentar reproducir brevemente para obtener duración
+              video.currentTime = 999999; // Ir al final
+              await new Promise(resolve => setTimeout(resolve, 100));
+              finalDuration = video.currentTime;
+              video.currentTime = 0;
+              
+              console.log('Duración alternativa obtenida:', finalDuration);
+              
+              // Si aún no es válida, usar duración estimada
+              if (!isFinite(finalDuration) || finalDuration <= 0) {
+                console.warn('No se pudo obtener duración, usando estimación por tamaño de archivo');
+                // Estimar duración basada en tamaño (muy aproximado)
+                const estimatedDuration = Math.max(5, videoBlob.size / (1024 * 1024) * 2); // ~2 segundos por MB
+                finalDuration = estimatedDuration;
+                console.log('Duración estimada:', finalDuration);
+              }
+            }
+
+            onProgress?.({
+              stage: 'processing',
+              progress: 25,
+              message: `Procesando video (${Math.round(finalDuration)}s)...`
+            });
+
+            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+            
+            // Crear source desde el elemento video
+            const source = audioContext.createMediaElementSource(video);
+            const destination = audioContext.createMediaStreamDestination();
+            
+            // Conectar directamente sin analyser para evitar problemas
+            source.connect(destination);
+
+            onProgress?.({
+              stage: 'converting',
+              progress: 50,
+              message: 'Configurando captura de audio...'
+            });
+
+            // Crear MediaRecorder para capturar el audio
+            const mediaRecorder = new MediaRecorder(destination.stream, {
+              mimeType: this.getSupportedAudioMimeType()
+            });
+
+            const audioChunks: Blob[] = [];
+
+            mediaRecorder.ondataavailable = (event) => {
+              if (event.data.size > 0) {
+                audioChunks.push(event.data);
+                console.log('Audio chunk recibido:', event.data.size, 'bytes');
+              }
+            };
+
+            mediaRecorder.onstop = () => {
+              console.log('MediaRecorder detenido, chunks:', audioChunks.length);
+              
+              if (audioChunks.length === 0) {
+                reject(new Error('No se capturó audio. Asegúrate de que el video tenga audio.'));
+                return;
+              }
+
+              onProgress?.({
+                stage: 'complete',
+                progress: 100,
+                message: 'Audio extraído exitosamente'
+              });
+
+              const audioBlob = new Blob(audioChunks, { 
+                type: this.getSupportedAudioMimeType() 
+              });
+
+              console.log('Audio blob creado:', audioBlob.size, 'bytes, tipo:', audioBlob.type);
+
+              // Limpiar recursos
+              URL.revokeObjectURL(video.src);
+              audioContext.close();
+
+              resolve({
+                audioBlob,
+                duration: finalDuration,
+                sampleRate: audioContext.sampleRate,
+                channels: 2 // Asumimos estéreo por defecto
+              });
+            };
+
+            mediaRecorder.onerror = (event) => {
+              console.error('MediaRecorder error:', event);
+              reject(new Error(`Error en MediaRecorder: ${event}`));
+            };
+
+            mediaRecorder.onstart = () => {
+              console.log('MediaRecorder iniciado');
+            };
+
+            // Iniciar grabación
+            mediaRecorder.start(100); // Chunks más frecuentes
+            console.log('MediaRecorder.start() llamado');
+            
+            // Reproducir el video para capturar audio
+            video.currentTime = 0;
+            
+            const playPromise = video.play();
+            if (playPromise) {
+              await playPromise;
+              console.log('Video reproduciendo para captura de audio');
+            }
+
+            // Actualizar progreso durante la reproducción
+            const progressInterval = setInterval(() => {
+              if (video.currentTime >= 0 && isFinite(finalDuration) && finalDuration > 0) {
+                const progress = 50 + (video.currentTime / finalDuration) * 40;
+                onProgress?.({
+                  stage: 'converting',
+                  progress: Math.min(progress, 90),
+                  message: `Procesando... ${Math.round(video.currentTime)}s / ${Math.round(finalDuration)}s`
+                });
+              }
+            }, 500);
+
+            video.onended = () => {
+              console.log('Video terminó, deteniendo MediaRecorder');
+              clearInterval(progressInterval);
+              setTimeout(() => {
+                if (mediaRecorder.state === 'recording') {
+                  mediaRecorder.stop();
+                }
+              }, 100); // Pequeña pausa para asegurar que se capture todo
+            };
+
+            video.onerror = (e) => {
+              console.error('Error en elemento video:', e);
+              clearInterval(progressInterval);
+              reject(new Error('Error al reproducir el video'));
+            };
+
+            // Timeout de seguridad
+            setTimeout(() => {
+              if (mediaRecorder.state === 'recording') {
+                console.log('Timeout: forzando parada del MediaRecorder');
+                clearInterval(progressInterval);
+                mediaRecorder.stop();
+              }
+            }, (finalDuration + 5) * 1000); // Duración + 5 segundos de margen
+
+          } catch (error) {
+            console.error('Error en procesamiento de video:', error);
+            reject(error);
+          }
+        };
+
+        video.onerror = (e) => {
+          console.error('Error cargando video:', e);
+          reject(new Error('Error al cargar el video'));
+        };
+
+        // Timeout para carga del video con fallback
+        const loadTimeout = setTimeout(() => {
+          if (video.readyState < 1) {
+            console.warn('Video tardó en cargar metadata, intentando método alternativo...');
+            this.extractAudioFallback(videoBlob, onProgress)
+              .then(resolve)
+              .catch(reject);
+          }
+        }, 5000);
+
+        // Limpiar timeout si se carga correctamente
+        video.addEventListener('loadedmetadata', () => {
+          clearTimeout(loadTimeout);
+        }, { once: true });
+
+      } catch (error) {
+        console.error('Error general en extractAudioWithWebAudio:', error);
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * Método fallback para extraer audio cuando el método principal falla
+   */
+  private async extractAudioFallback(
+    videoBlob: Blob,
+    onProgress?: (progress: AudioExtractionProgress) => void
+  ): Promise<AudioExtractionResult> {
+    console.log('🔄 Usando método fallback para extracción de audio');
+    
+    return new Promise((resolve, reject) => {
+      try {
         onProgress?.({
           stage: 'processing',
           progress: 25,
-          message: 'Decodificando audio...'
+          message: 'Intentando método alternativo...'
         });
 
-        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-        
-        // Decodificar audio del video
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-        
-        onProgress?.({
-          stage: 'converting',
-          progress: 75,
-          message: 'Convirtiendo formato...'
-        });
+        const video = document.createElement('video');
+        video.src = URL.createObjectURL(videoBlob);
+        video.muted = false;
+        video.controls = false;
 
-        // Convertir AudioBuffer a WAV
-        const wavBlob = this.audioBufferToWav(audioBuffer);
-        
-        onProgress?.({
-          stage: 'complete',
-          progress: 100,
-          message: 'Audio extraído exitosamente'
-        });
+        // No esperar metadata, forzar reproducción
+        video.oncanplay = async () => {
+          try {
+            console.log('Video puede reproducirse, iniciando captura...');
+            
+            onProgress?.({
+              stage: 'converting',
+              progress: 50,
+              message: 'Capturando audio sin metadata...'
+            });
 
-        await audioContext.close();
+            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const source = audioContext.createMediaElementSource(video);
+            const destination = audioContext.createMediaStreamDestination();
+            
+            source.connect(destination);
 
-        resolve({
-          audioBlob: wavBlob,
-          duration: audioBuffer.duration,
-          sampleRate: audioBuffer.sampleRate,
-          channels: audioBuffer.numberOfChannels
-        });
+            const mediaRecorder = new MediaRecorder(destination.stream, {
+              mimeType: this.getSupportedAudioMimeType()
+            });
+
+            const audioChunks: Blob[] = [];
+            let recordingStartTime = Date.now();
+
+            mediaRecorder.ondataavailable = (event) => {
+              if (event.data.size > 0) {
+                audioChunks.push(event.data);
+                console.log('Fallback: Audio chunk recibido:', event.data.size, 'bytes');
+              }
+            };
+
+            mediaRecorder.onstop = () => {
+              const recordingDuration = (Date.now() - recordingStartTime) / 1000;
+              console.log('Fallback: Grabación completada, duración:', recordingDuration);
+
+              if (audioChunks.length === 0) {
+                reject(new Error('Método fallback: No se capturó audio'));
+                return;
+              }
+
+              onProgress?.({
+                stage: 'complete',
+                progress: 100,
+                message: 'Audio extraído con método alternativo'
+              });
+
+              const audioBlob = new Blob(audioChunks, { 
+                type: this.getSupportedAudioMimeType() 
+              });
+
+              URL.revokeObjectURL(video.src);
+              audioContext.close();
+
+              resolve({
+                audioBlob,
+                duration: recordingDuration,
+                sampleRate: audioContext.sampleRate,
+                channels: 2
+              });
+            };
+
+            mediaRecorder.start(100);
+            await video.play();
+
+            // Parar después de 30 segundos máximo o cuando termine
+            const maxDuration = 30000; // 30 segundos máximo
+            const stopTimeout = setTimeout(() => {
+              if (mediaRecorder.state === 'recording') {
+                console.log('Fallback: Timeout alcanzado, deteniendo...');
+                mediaRecorder.stop();
+              }
+            }, maxDuration);
+
+            video.onended = () => {
+              clearTimeout(stopTimeout);
+              if (mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+              }
+            };
+
+            video.onerror = () => {
+              clearTimeout(stopTimeout);
+              reject(new Error('Fallback: Error reproduciendo video'));
+            };
+
+          } catch (error) {
+            reject(error);
+          }
+        };
+
+        video.onerror = () => {
+          reject(new Error('Fallback: Error cargando video'));
+        };
+
+        // Timeout para el fallback
+        setTimeout(() => {
+          reject(new Error('Fallback: Timeout en método alternativo'));
+        }, 35000);
 
       } catch (error) {
-        reject(new Error(`Error extrayendo audio: ${error instanceof Error ? error.message : 'Error desconocido'}`));
+        reject(error);
       }
     });
   }

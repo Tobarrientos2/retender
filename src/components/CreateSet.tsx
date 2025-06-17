@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
@@ -27,27 +27,18 @@ export function CreateSet({ onBack, onComplete }: CreateSetProps) {
   const analyzeImage = useAction(api.affirmations.analyzeImage);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Handle paste events for images
-  useEffect(() => {
-    const handlePaste = async (e: ClipboardEvent) => {
-      if (!textareaRef.current || document.activeElement !== textareaRef.current) {
-        return;
-      }
+  // Handle paste events for images - Solo cuando el textarea está enfocado
+  const handleTextareaPaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
 
-      const items = e.clipboardData?.items;
-      if (!items) return;
-
-      const imageItems = Array.from(items).filter(item => item.type.startsWith('image/'));
-      
-      if (imageItems.length > 0) {
-        e.preventDefault();
-        await processImages(imageItems);
-      }
-    };
-
-    document.addEventListener('paste', handlePaste);
-    return () => document.removeEventListener('paste', handlePaste);
-  }, []);
+    const imageItems = Array.from(items).filter(item => item.type.startsWith('image/'));
+    
+    if (imageItems.length > 0) {
+      e.preventDefault();
+      await processImages(imageItems);
+    }
+  };
 
   const processImages = async (items: DataTransferItem[]) => {
     setIsProcessingImages(true);
@@ -263,6 +254,7 @@ export function CreateSet({ onBack, onComplete }: CreateSetProps) {
               id="content"
               value={content}
               onChange={(e) => setContent(e.target.value)}
+              onPaste={handleTextareaPaste}
               placeholder="Paste your document content, lecture notes, or any text you want to study. You can also paste images directly with Ctrl+V and they'll be processed automatically!"
               rows={16}
               className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:border-black focus:ring-1 focus:ring-black outline-none transition-all resize-none font-mono text-sm"
