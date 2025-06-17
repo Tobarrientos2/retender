@@ -12,6 +12,8 @@ import { SessionCollectionsList } from "./SessionCollectionsList";
 import { RecordScreen } from "./RecordScreen";
 import { RecordingSettings } from "./RecordingSettings";
 import { BackgroundTranscriber } from "./BackgroundTranscriber";
+import { BackgroundTranscriptionNotifier, TranscriptionStatusPanel } from "./BackgroundTranscriptionNotifier";
+import { CleanupOrphanedJobs } from "./CleanupOrphanedJobs";
 
 interface SessionData {
   sessionId: number;
@@ -167,6 +169,14 @@ export function Dashboard() {
 
   return (
     <div className="space-y-12">
+      {/* Background Transcription Notifier - Persiste durante toda la sesión */}
+      <BackgroundTranscriptionNotifier
+        onTranscriptionComplete={(jobId, result) => {
+          console.log('Transcripción completada en background:', jobId, result);
+          // Aquí podrías navegar automáticamente o mostrar el resultado
+        }}
+      />
+
       {/* Header */}
       <div className="text-center">
         <h2 className="text-2xl font-light text-gray-900 mb-2">
@@ -179,6 +189,12 @@ export function Dashboard() {
           }
         </p>
       </div>
+
+      {/* Panel de Estado de Transcripciones */}
+      <TranscriptionStatusPanel />
+
+      {/* Herramienta temporal de limpieza */}
+      <CleanupOrphanedJobs />
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 max-w-7xl mx-auto">

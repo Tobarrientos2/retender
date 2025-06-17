@@ -61,7 +61,7 @@ export class TranscriptionApiClient {
   private baseUrl: string;
   private timeout: number;
 
-  constructor(baseUrl: string = 'http://localhost:8000', timeout: number = 300000) {
+  constructor(baseUrl: string = 'http://localhost:8001', timeout: number = 300000) {
     this.baseUrl = baseUrl.replace(/\/$/, ''); // Remove trailing slash
     this.timeout = timeout; // 5 minutes default timeout
   }

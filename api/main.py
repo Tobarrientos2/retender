@@ -9,6 +9,10 @@ import asyncio
 from pathlib import Path
 from typing import Optional, List
 import aiofiles
+from dotenv import load_dotenv
+
+# Cargar variables de entorno desde .env
+load_dotenv()
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form, BackgroundTasks, Depends, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,6 +24,7 @@ from services.transcription_service import TranscriptionService
 from services.audio_processor import AudioProcessor
 from services.job_queue_service import job_queue_service
 from services.websocket_manager import websocket_manager
+from services.convex_client import initialize_convex_client
 from models.transcription_models import (
     TranscriptionResponse,
     TranscriptionRequest,
@@ -99,6 +104,17 @@ async def startup_event():
         logger.info("🔄 Inicializando job queue service...")
         await job_queue_service.start()
         logger.info("✅ Job queue service inicializado")
+
+        # 🆕 INICIALIZAR CONVEX CLIENT
+        convex_url = os.getenv("CONVEX_URL")
+        convex_api_key = os.getenv("CONVEX_API_KEY")
+
+        if convex_url:
+            logger.info("🔄 Inicializando ConvexClient...")
+            initialize_convex_client(convex_url, convex_api_key)
+            logger.info(f"✅ ConvexClient inicializado para {convex_url}")
+        else:
+            logger.warning("⚠️ CONVEX_URL no configurada, sincronización deshabilitada")
 
         # Verificar health check después de inicialización
         logger.info("🔍 Verificando health check post-inicialización...")
@@ -403,7 +419,7 @@ async def submit_transcription_job(
             websocket_url = f"wss://{host}/ws/transcription/{job_id}"
         else:
             # Desarrollo local - siempre usar localhost
-            port = os.getenv("PORT", "8000")
+            port = os.getenv("PORT", "8001")
             websocket_url = f"ws://localhost:{port}/ws/transcription/{job_id}"
 
         # Estimar tiempo de procesamiento (aproximado)

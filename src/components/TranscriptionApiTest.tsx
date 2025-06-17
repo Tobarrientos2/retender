@@ -16,7 +16,7 @@ export function TranscriptionApiTest() {
   } = useTranscriptionApi();
 
   const [testAudioBlob, setTestAudioBlob] = useState<Blob | null>(null);
-  const [apiUrl, setApiUrlState] = useState('http://localhost:8000');
+  const [apiUrl, setApiUrlState] = useState('http://localhost:8001');
   const [selectedModel, setSelectedModel] = useState('base');
   const [selectedLanguage, setSelectedLanguage] = useState('auto');
   const [models, setModels] = useState<any[]>([]);

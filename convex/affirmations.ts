@@ -146,7 +146,9 @@ export const createAffirmationsFromTranscription = action({
     audioInfo: v.optional(v.object({
       duration: v.number(),
       processingTime: v.number(),
+      createdAt: v.optional(v.number()),
     })),
+    transcriptionJobId: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<string> => {
     const userId = await getAuthUserId(ctx);
@@ -183,6 +185,8 @@ NOTA: Genera todas las afirmaciones en español, independientemente del idioma d
       title,
       content: args.transcriptionText,
       totalAffirmations: affirmations.length,
+      transcriptionJobId: args.transcriptionJobId,
+      audioInfo: args.audioInfo,
     });
 
     // Create individual affirmations
@@ -236,14 +240,25 @@ export const createSet = internalMutation({
     title: v.string(),
     content: v.string(),
     totalAffirmations: v.number(),
+    transcriptionJobId: v.optional(v.string()),
+    audioInfo: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
+    const now = Date.now();
     return await ctx.db.insert("affirmationSets", {
       userId: args.userId,
       title: args.title,
       description: `Generated from ${args.content.length} characters of content`,
       sourceContent: args.content,
       totalAffirmations: args.totalAffirmations,
+      createdAt: now, // Timestamp de creación
+      transcriptionJobId: args.transcriptionJobId,
+      metadata: {
+        source: "transcription",
+        audioInfo: args.audioInfo,
+        createdTimestamp: now,
+        generatedAt: new Date(now).toISOString(),
+      },
     });
   },
 });

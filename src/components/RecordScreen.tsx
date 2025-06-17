@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { transcriptionService, TranscriptionResponse } from '../services/transcriptionService';
 import { useAction } from 'convex/react';
 import { api } from '../../convex/_generated/api';
+import { usePersistentTranscription } from '../hooks/usePersistentTranscription';
 
 interface RecordScreenProps {
   onBack: () => void;
@@ -17,7 +18,38 @@ export function RecordScreen({ onBack }: RecordScreenProps) {
   const [transcription, setTranscription] = useState<TranscriptionResponse | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isGeneratingAffirmations, setIsGeneratingAffirmations] = useState(false);
+  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  // Hook para transcripción persistente
+  const {
+    startTranscription,
+    getJobById,
+    hasActiveJobs
+  } = usePersistentTranscription({
+    onJobComplete: (jobId, result) => {
+      if (jobId === currentJobId) {
+        console.log('Transcripción completada:', result);
+        setTranscription(result);
+        setIsTranscribing(false);
+        setCurrentJobId(null);
+        toast.success(`🎉 Transcripción completada en background!`);
+      }
+    },
+    onJobError: (jobId, error) => {
+      if (jobId === currentJobId) {
+        console.error('Error en transcripción:', error);
+        setIsTranscribing(false);
+        setCurrentJobId(null);
+        toast.error(`❌ Error en transcripción: ${error}`);
+      }
+    },
+    onJobProgress: (jobId, progress, message) => {
+      if (jobId === currentJobId) {
+        console.log(`Progreso ${jobId}: ${progress}% - ${message}`);
+      }
+    }
+  });
 
   // Convex actions
   const createAffirmationsFromTranscription = useAction(api.affirmations.createAffirmationsFromTranscription);
@@ -108,18 +140,32 @@ export function RecordScreen({ onBack }: RecordScreenProps) {
     setTranscription(null);
 
     try {
-      console.log('Iniciando transcripción...');
-      const result = await transcriptionService.transcribeAudioSimple(audioBlob);
-      
-      console.log('Transcripción completada:', result);
-      setTranscription(result);
-      toast.success(`Transcripción completada en ${result.processing_time.toFixed(2)}s`);
-      
+      console.log('Iniciando transcripción persistente...');
+
+      // Crear archivo desde el blob
+      const fileName = `screen-recording-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.wav`;
+      const file = new File([audioBlob], fileName, { type: audioBlob.type });
+
+      // Iniciar transcripción persistente
+      const jobId = await startTranscription(file, {
+        language: 'auto',
+        return_timestamps: true,
+        temperature: 0.0
+      });
+
+      setCurrentJobId(jobId);
+
+      toast.success(`🚀 Transcripción iniciada en background`, {
+        description: `Job ID: ${jobId.slice(0, 8)}... - Puedes navegar a otras secciones`,
+        duration: 5000
+      });
+
+      console.log(`✅ Job persistente iniciado: ${jobId}`);
+
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Error al transcribir audio';
+      const errorMessage = error instanceof Error ? error.message : 'Error al iniciar transcripción';
       console.error('Error en transcripción:', error);
       toast.error(errorMessage);
-    } finally {
       setIsTranscribing(false);
     }
   };
@@ -138,22 +184,33 @@ export function RecordScreen({ onBack }: RecordScreenProps) {
     setIsGeneratingAffirmations(true);
 
     try {
-      const title = `Afirmaciones de Audio - ${new Date().toLocaleDateString()}`;
+      const now = new Date();
+      const timestamp = now.toLocaleString('es-ES', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      const title = `Afirmaciones de Audio - ${timestamp}`;
 
       console.log('Generando afirmaciones desde transcripción...', {
         title,
         contentLength: transcription.text.length,
         language: transcription.language,
-        audioInfo
+        audioInfo,
+        timestamp: now.getTime()
       });
 
       const setId = await createAffirmationsFromTranscription({
         transcriptionText: transcription.text,
         title,
         language: transcription.language,
+        transcriptionJobId: currentJobId || undefined,
         audioInfo: audioInfo ? {
           duration: audioInfo.duration,
           processingTime: transcription.processing_time || 0,
+          createdAt: now.getTime(), // Timestamp de creación
         } : undefined,
       });
 
@@ -280,9 +337,9 @@ export function RecordScreen({ onBack }: RecordScreenProps) {
 
                   <button
                     onClick={handleTranscribeAudio}
-                    disabled={isTranscribing}
+                    disabled={isTranscribing || hasActiveJobs}
                     className={`w-full px-4 py-3 rounded-lg transition-colors mb-3 ${
-                      isTranscribing
+                      isTranscribing || hasActiveJobs
                         ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
                         : 'bg-purple-500 text-white hover:bg-purple-600'
                     }`}
@@ -290,12 +347,23 @@ export function RecordScreen({ onBack }: RecordScreenProps) {
                     {isTranscribing ? (
                       <>
                         <span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
-                        Transcribiendo...
+                        Transcribiendo en Background...
+                      </>
+                    ) : hasActiveJobs ? (
+                      <>
+                        <span className="animate-pulse inline-block w-4 h-4 bg-yellow-400 rounded-full mr-2"></span>
+                        Hay transcripciones activas
                       </>
                     ) : (
-                      '🎯 Transcribir Audio'
+                      '🎯 Transcribir Audio (Background)'
                     )}
                   </button>
+
+                  {(isTranscribing || hasActiveJobs) && (
+                    <p className="text-xs text-purple-600 text-center mb-3">
+                      💡 La transcripción continúa en background. Puedes navegar a otras secciones.
+                    </p>
+                  )}
 
                   <div className="flex space-x-3">
                     <button

@@ -6,7 +6,7 @@ import asyncio
 import uuid
 from typing import Dict, Optional, Callable, Any
 from datetime import datetime
-from loguru import logger
+import logging
 
 from models.transcription_models import (
     TranscriptionJob,
@@ -14,6 +14,9 @@ from models.transcription_models import (
     TranscriptionRequest,
     TranscriptionResponse
 )
+from services.convex_client import get_convex_client
+
+logger = logging.getLogger(__name__)
 
 
 class JobQueueService:
@@ -199,9 +202,12 @@ class JobQueueService:
             job.progress = 100.0
             job.result = result
             job.completed_at = datetime.now()
-            
+
             await self._notify_progress(job_id)
-            
+
+            # 🆕 SINCRONIZAR CON CONVEX
+            await self._sync_job_with_convex(job)
+
             logger.info(f"✅ Job completado: {job_id}")
             
         except asyncio.CancelledError:
@@ -217,8 +223,11 @@ class JobQueueService:
             job.message = f"Error: {str(e)}"
             job.error = str(e)
             job.completed_at = datetime.now()
-            
+
             await self._notify_progress(job_id)
+
+            # 🆕 SINCRONIZAR ERROR CON CONVEX
+            await self._sync_job_with_convex(job)
             
             logger.error(f"❌ Job falló {job_id}: {e}")
             
@@ -271,7 +280,50 @@ class JobQueueService:
         await self._notify_progress(job.job_id)
         
         return result
-    
+
+    async def _sync_job_with_convex(self, job: TranscriptionJob):
+        """
+        Sincronizar estado del job con Convex Database
+
+        Args:
+            job: Job a sincronizar
+        """
+        convex_client = get_convex_client()
+        if not convex_client:
+            logger.warning(f"⚠️ ConvexClient no configurado, saltando sincronización para job {job.job_id}")
+            return
+
+        try:
+            # Convertir resultado a formato serializable
+            result_data = None
+            if job.result:
+                result_data = {
+                    "text": job.result.text,
+                    "language": job.result.language,
+                    "duration": job.result.duration,
+                    "segments": job.result.segments if hasattr(job.result, 'segments') else None,
+                    "processing_time": job.result.processing_time if hasattr(job.result, 'processing_time') else None
+                }
+
+            # Sincronizar con Convex
+            success = await convex_client.update_job_status(
+                job_id=job.job_id,
+                status=job.status.value,  # Convertir enum a string
+                progress=job.progress,
+                result=result_data,
+                error=job.error,
+                started_at=job.started_at,
+                completed_at=job.completed_at
+            )
+
+            if success:
+                logger.info(f"🔄 Job {job.job_id} sincronizado exitosamente con Convex")
+            else:
+                logger.error(f"❌ Falló sincronización de job {job.job_id} con Convex")
+
+        except Exception as e:
+            logger.error(f"💥 Error inesperado sincronizando job {job.job_id} con Convex: {e}")
+
     async def _notify_progress(self, job_id: str):
         """Notificar progreso a través del callback"""
         if job_id in self.progress_callbacks:

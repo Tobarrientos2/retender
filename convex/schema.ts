@@ -10,7 +10,10 @@ const applicationTables = {
     sourceContent: v.string(),
     totalAffirmations: v.number(),
     metadata: v.optional(v.any()), // Para información de audio transcription
-  }).index("by_user", ["userId"]),
+    createdAt: v.optional(v.number()), // Timestamp de creación
+    transcriptionJobId: v.optional(v.string()), // ID del job de transcripción
+  }).index("by_user", ["userId"])
+    .index("by_created_at", ["userId", "createdAt"]),
 
   affirmations: defineTable({
     setId: v.id("affirmationSets"),
@@ -28,7 +31,10 @@ const applicationTables = {
     totalAffirmations: v.number(),
     totalSessions: v.number(),
     contentType: v.string(), // "general" | "programming"
-  }).index("by_user", ["userId"]),
+    createdAt: v.optional(v.number()), // Timestamp de creación
+    transcriptionJobId: v.optional(v.string()), // ID del job de transcripción
+  }).index("by_user", ["userId"])
+    .index("by_created_at", ["userId", "createdAt"]),
 
   sessions: defineTable({
     collectionId: v.id("sessionCollections"),
@@ -71,6 +77,27 @@ const applicationTables = {
     autoTranscribe: v.boolean(),  // Auto-transcribir después de grabar
     preferredLanguage: v.string(), // Idioma preferido para transcripción
   }).index("by_user", ["userId"]),
+
+  // Jobs de transcripción en background
+  transcriptionJobs: defineTable({
+    userId: v.id("users"),
+    jobId: v.string(), // ID del job en la API
+    status: v.string(), // "pending", "processing", "completed", "failed", "cancelled"
+    progress: v.number(), // 0-100
+    message: v.string(), // Mensaje de estado
+    fileName: v.optional(v.string()), // Nombre del archivo original
+    fileSize: v.optional(v.number()), // Tamaño del archivo en bytes
+    audioInfo: v.optional(v.any()), // Información del audio
+    result: v.optional(v.any()), // Resultado de la transcripción
+    error: v.optional(v.string()), // Error si falló
+    createdAt: v.number(), // Timestamp de creación
+    startedAt: v.optional(v.number()), // Timestamp de inicio
+    completedAt: v.optional(v.number()), // Timestamp de finalización
+    estimatedTimeRemaining: v.optional(v.number()), // Tiempo estimado restante
+  }).index("by_user", ["userId"])
+    .index("by_job_id", ["jobId"])
+    .index("by_status", ["userId", "status"])
+    .index("by_created_at", ["userId", "createdAt"]),
 
 
 

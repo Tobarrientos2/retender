@@ -69,7 +69,7 @@ export function useBackgroundTranscription(
 ): UseBackgroundTranscriptionReturn {
   
   const {
-    apiBaseUrl = 'http://localhost:8000', // Corregir puerto para coincidir con la API
+    apiBaseUrl = 'http://localhost:8001', // Corregir puerto para coincidir con la API
     onProgress,
     onComplete,
     onError
@@ -267,7 +267,7 @@ export function useBackgroundTranscription(
       currentJobIdRef.current = jobResponse.job_id;
 
       // Conectar WebSocket para seguir progreso
-      const wsUrl = jobResponse.websocket_url.replace('localhost:9000', 'localhost:8000'); // Ajustar puerto para coincidir con la API
+      const wsUrl = jobResponse.websocket_url.replace('localhost:8000', 'localhost:8001'); // Ajustar puerto para coincidir con la API
       webSocket.connect(wsUrl);
 
       console.log(`✅ Job enviado: ${jobResponse.job_id}`);
