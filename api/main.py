@@ -39,11 +39,27 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# Configuración CORS para desarrollo
+# Configuración CORS dinámica basada en entorno
+import os
+
+# Configuración CORS basada en entorno
+if os.getenv("ENVIRONMENT") == "production":
+    # Producción: CORS específico para dominios conocidos
+    allowed_origins = [
+        "https://*.koyeb.app",
+        "https://localhost:5174",
+        "https://localhost:3000"
+    ]
+    allow_credentials = True
+else:
+    # Desarrollo: CORS permisivo
+    allowed_origins = ["*"]
+    allow_credentials = False
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Permitir todos los orígenes en desarrollo
-    allow_credentials=False,  # Cambiar a False cuando allow_origins es "*"
+    allow_origins=allowed_origins,
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -61,17 +77,42 @@ async def startup_event():
     """Inicializar servicios al arrancar la API"""
     logger.info("🚀 Iniciando Audio Transcription API")
 
-    # Crear directorio de logs si no existe
-    os.makedirs("logs", exist_ok=True)
-    os.makedirs("temp", exist_ok=True)
+    try:
+        # Crear directorio de logs si no existe
+        os.makedirs("logs", exist_ok=True)
+        os.makedirs("temp", exist_ok=True)
+        logger.info("📁 Directorios creados correctamente")
 
-    # Inicializar modelo Whisper
-    await transcription_service.initialize()
+        # Verificar variables de entorno críticas
+        groq_api_key = os.getenv("GROQ_API_KEY")
+        if groq_api_key:
+            logger.info("🔑 GROQ_API_KEY encontrada")
+        else:
+            logger.error("❌ GROQ_API_KEY no encontrada en variables de entorno")
 
-    # Inicializar job queue service
-    await job_queue_service.start()
+        # Inicializar servicio de transcripción
+        logger.info("🔄 Inicializando servicio de transcripción...")
+        await transcription_service.initialize()
+        logger.info("✅ Servicio de transcripción inicializado")
 
-    logger.info("✅ Servicios inicializados correctamente")
+        # Inicializar job queue service
+        logger.info("🔄 Inicializando job queue service...")
+        await job_queue_service.start()
+        logger.info("✅ Job queue service inicializado")
+
+        # Verificar health check después de inicialización
+        logger.info("🔍 Verificando health check post-inicialización...")
+        is_healthy = await transcription_service.health_check()
+        if is_healthy:
+            logger.info("✅ Health check post-inicialización exitoso")
+        else:
+            logger.warning("⚠️ Health check post-inicialización falló")
+
+        logger.info("✅ Todos los servicios inicializados correctamente")
+
+    except Exception as e:
+        logger.error(f"❌ Error durante startup: {e}")
+        raise
 
 
 @app.on_event("shutdown")
@@ -96,18 +137,73 @@ async def root():
     )
 
 
+@app.get("/debug/status")
+async def debug_status():
+    """Endpoint de debug para verificar estado de inicialización"""
+    from services.groq_transcription_service import groq_transcription_service
+
+    status = {
+        "api_version": "1.0.0",
+        "groq_api_key_present": bool(os.getenv("GROQ_API_KEY")),
+        "groq_client_initialized": groq_transcription_service.client is not None,
+        "groq_api_key_format_valid": False,
+        "transcription_service_healthy": False
+    }
+
+    # Verificar formato de API key
+    api_key = os.getenv("GROQ_API_KEY")
+    if api_key:
+        status["groq_api_key_format_valid"] = api_key.startswith('gsk_')
+
+    # Verificar health del servicio
+    try:
+        status["transcription_service_healthy"] = await transcription_service.health_check()
+    except Exception as e:
+        status["health_check_error"] = str(e)
+
+    return status
+
+
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
-    """Health check endpoint"""
-    is_healthy = await transcription_service.health_check()
-    
-    if not is_healthy:
-        raise HTTPException(status_code=503, detail="Servicio no disponible")
-    
-    return HealthResponse(
-        status="healthy",
-        message="Todos los servicios funcionando correctamente",
-        version="1.0.0"
+    """Health check endpoint con retry logic"""
+    import asyncio
+
+    # Implementar retry logic para health check
+    max_retries = 3
+    retry_delay = 1.0  # segundos
+
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"🔍 Health check attempt {attempt + 1}/{max_retries}")
+
+            # Verificar que el servicio esté inicializado
+            is_healthy = await transcription_service.health_check()
+
+            if is_healthy:
+                logger.info("✅ Health check exitoso")
+                return HealthResponse(
+                    status="healthy",
+                    message="Todos los servicios funcionando correctamente",
+                    version="1.0.0"
+                )
+            else:
+                logger.warning(f"⚠️ Health check falló en intento {attempt + 1}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay)
+                    continue
+
+        except Exception as e:
+            logger.error(f"❌ Error en health check intento {attempt + 1}: {e}")
+            if attempt < max_retries - 1:
+                await asyncio.sleep(retry_delay)
+                continue
+
+    # Si llegamos aquí, todos los intentos fallaron
+    logger.error("❌ Health check falló después de todos los intentos")
+    raise HTTPException(
+        status_code=503,
+        detail="Servicio no disponible después de múltiples intentos"
     )
 
 
@@ -116,7 +212,7 @@ async def transcribe_audio(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(..., description="Archivo de audio a transcribir"),
     language: Optional[str] = Form(default="auto", description="Idioma del audio (auto, es, en, fr, etc.)"),
-    model: Optional[str] = Form(default="large", description="Modelo Whisper (tiny, base, small, medium, large)"),
+    model: Optional[str] = Form(default="whisper-large-v3-turbo", description="Modelo Whisper (whisper-large-v3-turbo)"),
     return_timestamps: bool = Form(default=True, description="Incluir timestamps en la transcripción"),
     temperature: float = Form(default=0.0, description="Temperatura para la transcripción (0.0-1.0)"),
     initial_prompt: Optional[str] = Form(default=None, description="Prompt inicial para mejorar la transcripción")
@@ -224,34 +320,13 @@ async def get_available_models():
     return {
         "models": [
             {
-                "name": "tiny",
-                "size": "39 MB",
-                "description": "Más rápido, menor precisión",
-                "languages": "Multiidioma"
-            },
-            {
-                "name": "base", 
-                "size": "74 MB",
-                "description": "Equilibrio entre velocidad y precisión",
-                "languages": "Multiidioma"
-            },
-            {
-                "name": "small",
-                "size": "244 MB", 
-                "description": "Buena precisión, velocidad moderada",
-                "languages": "Multiidioma"
-            },
-            {
-                "name": "medium",
-                "size": "769 MB",
-                "description": "Alta precisión, más lento",
-                "languages": "Multiidioma"
-            },
-            {
-                "name": "large",
-                "size": "1550 MB",
-                "description": "Máxima precisión, más lento",
-                "languages": "Multiidioma"
+                "name": "whisper-large-v3-turbo",
+                "size": "Cloud API",
+                "description": "🚀 Groq Cloud: Whisper Large-v3 Turbo - Máxima calidad y velocidad extrema",
+                "languages": "Multiidioma",
+                "provider": "Groq Cloud",
+                "daily_limit": "2000 requests",
+                "features": ["Calidad Large-v3", "10x más rápido", "Sin límites de RAM", "Procesamiento en la nube"]
             }
         ]
     }
@@ -284,7 +359,7 @@ async def get_supported_languages():
 async def submit_transcription_job(
     file: UploadFile = File(..., description="Archivo de audio a transcribir"),
     language: Optional[str] = Form(default="auto", description="Idioma del audio (auto, es, en, fr, etc.)"),
-    model: Optional[str] = Form(default="medium", description="Modelo Whisper (tiny, base, small, medium, large)"),
+    model: Optional[str] = Form(default="whisper-large-v3-turbo", description="Modelo Whisper (whisper-large-v3-turbo)"),
     return_timestamps: bool = Form(default=True, description="Incluir timestamps en la transcripción"),
     temperature: float = Form(default=0.0, description="Temperatura para la transcripción (0.0-1.0)"),
     initial_prompt: Optional[str] = Form(default=None, description="Prompt inicial para mejorar la transcripción")
@@ -350,8 +425,17 @@ async def submit_transcription_job(
             progress_callback
         )
 
-        # Crear URL del WebSocket (usar puerto dinámico)
-        websocket_url = f"ws://localhost:9001/ws/transcription/{job_id}"
+        # Crear URL del WebSocket dinámicamente
+        host = os.getenv("HOST", "localhost")
+        port = os.getenv("PORT", "9001")
+
+        # En producción, usar WSS y dominio de Koyeb
+        if os.getenv("ENVIRONMENT") == "production":
+            # Koyeb proporciona HTTPS/WSS automáticamente
+            websocket_url = f"wss://{host}/ws/transcription/{job_id}"
+        else:
+            # Desarrollo local
+            websocket_url = f"ws://{host}:{port}/ws/transcription/{job_id}"
 
         # Estimar tiempo de procesamiento (aproximado)
         estimated_time = file_size / (1024 * 1024) * 30  # ~30 segundos por MB

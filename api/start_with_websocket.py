@@ -13,7 +13,7 @@ def check_dependencies():
     """Verificar que las dependencias estén instaladas"""
     try:
         import fastapi
-        import faster_whisper
+        import groq
         import ffmpeg
         import websockets
         import aiohttp
@@ -92,7 +92,7 @@ def main():
     parser.add_argument("--host", default="0.0.0.0", help="Host del servidor")
     parser.add_argument("--port", type=int, default=9000, help="Puerto del servidor")
     parser.add_argument("--reload", action="store_true", help="Habilitar auto-reload")
-    parser.add_argument("--model", default="medium", help="Modelo Whisper por defecto")
+    parser.add_argument("--model", default="whisper-large-v3-turbo", help="Modelo Groq Cloud por defecto")
     parser.add_argument("--check-only", action="store_true", help="Solo verificar dependencias")
     parser.add_argument("--test-services", action="store_true", help="Probar servicios antes de iniciar")
     
@@ -133,7 +133,7 @@ def main():
     print(f"🌐 Servidor: http://{args.host}:{args.port}")
     print(f"📚 Documentación: http://{args.host}:{args.port}/docs")
     print(f"🔌 WebSocket: ws://{args.host}:{args.port}/ws/transcription/{{job_id}}")
-    print(f"🤖 Modelo por defecto: {args.model}")
+    print(f"🚀 Modelo: Groq Cloud {args.model}")
     print("=" * 60)
     print("\n📋 Endpoints disponibles:")
     print("  POST /transcribe-job     - Enviar job de transcripción")

@@ -8,7 +8,6 @@ import asyncio
 from typing import Optional, Dict, Any, Callable
 from pathlib import Path
 
-from faster_whisper import WhisperModel
 from loguru import logger
 
 from models.transcription_models import (
@@ -17,6 +16,7 @@ from models.transcription_models import (
     TranscriptionSegment,
     AudioInfo
 )
+from services.groq_transcription_service import groq_transcription_service
 
 
 class TranscriptionService:
@@ -32,10 +32,10 @@ class TranscriptionService:
     async def initialize(self):
         """Inicializar el servicio de transcripción"""
         logger.info("🔄 Inicializando servicio de transcripción...")
-        
-        # Cargar modelo medium por defecto (upgrade de base)
-        await self.load_model("medium")
-        
+
+        # Inicializar Groq Cloud API (Whisper Large-v3 Turbo)
+        await groq_transcription_service.initialize()
+
         logger.info("✅ Servicio de transcripción inicializado")
     
     async def load_model(self, model_name: str = "base") -> bool:
@@ -61,14 +61,10 @@ class TranscriptionService:
             logger.info(f"📥 Cargando modelo Whisper: {model_name}")
             start_time = time.time()
             
-            # Usar faster-whisper (más eficiente)
-            model = WhisperModel(
-                model_name,
-                device="cpu",  # Cambiar a "cuda" si tienes GPU
-                compute_type="int8"  # Usar int8 para mejor rendimiento en CPU
-            )
-            
-            self.models[model_name] = model
+            # Con Groq Cloud no necesitamos cargar modelos localmente
+            logger.info(f"📦 Modelo Groq Cloud configurado: {model_name}")
+            # Simular modelo cargado para compatibilidad
+            self.models[model_name] = "groq_cloud_model"
             self.current_model_name = model_name
             
             load_time = time.time() - start_time
@@ -82,61 +78,28 @@ class TranscriptionService:
     
     async def transcribe(self, request: TranscriptionRequest) -> TranscriptionResponse:
         """
-        Transcribir archivo de audio
-        
+        Transcribir archivo de audio usando Groq Cloud API
+
         Args:
             request: Request de transcripción
-            
+
         Returns:
             TranscriptionResponse: Resultado de la transcripción
         """
-        start_time = time.time()
-        
+        logger.info(f"🎤 Iniciando transcripción con Groq Cloud - Archivo: {Path(request.file_path).name}")
+
         try:
-            # Cargar modelo si es necesario
-            if request.model not in self.models:
-                success = await self.load_model(request.model)
-                if not success:
-                    raise Exception(f"No se pudo cargar el modelo {request.model}")
-            
-            model = self.models[request.model]
-            
-            # Obtener información del archivo de audio
-            audio_info = await self._get_audio_info(request.audio_file_path)
-            
-            logger.info(f"🎤 Transcribiendo: {Path(request.audio_file_path).name}")
-            logger.info(f"📊 Audio info: {audio_info.duration:.2f}s, {audio_info.sample_rate}Hz")
-            
-            # Transcribir usando faster-whisper
-            result = await self._transcribe_faster_whisper(model, request)
-            
-            processing_time = time.time() - start_time
-            
-            # Crear respuesta
-            response = TranscriptionResponse(
-                text=result["text"],
-                language=result["language"],
-                model_used=request.model,
-                segments=result.get("segments", []),
-                audio_info=audio_info,
-                processing_time=processing_time,
-                config={
-                    "model": request.model,
-                    "language": request.language,
-                    "return_timestamps": request.return_timestamps,
-                    "temperature": request.temperature,
-                    "initial_prompt": request.initial_prompt
-                }
-            )
-            
-            logger.info(f"✅ Transcripción completada en {processing_time:.2f}s")
+            # Usar Groq Cloud API para transcripción
+            response = await groq_transcription_service.transcribe_audio(request)
+
+            logger.info(f"✅ Transcripción completada en {response.processing_time:.2f}s")
             return response
-            
+
         except Exception as e:
             logger.error(f"❌ Error en transcripción: {e}")
             raise Exception(f"Error en transcripción: {str(e)}")
     
-    async def _transcribe_faster_whisper(self, model: WhisperModel, request: TranscriptionRequest) -> Dict[str, Any]:
+    async def _transcribe_faster_whisper(self, model: Any, request: TranscriptionRequest) -> Dict[str, Any]:
         """Transcribir usando faster-whisper"""
         
         # Configurar parámetros
@@ -227,16 +190,16 @@ class TranscriptionService:
     async def health_check(self) -> bool:
         """Verificar que el servicio esté funcionando"""
         try:
-            # Verificar que al menos un modelo esté cargado
-            if not self.models:
+            # Verificar que el servicio Groq esté healthy
+            is_groq_healthy = await groq_transcription_service.health_check()
+
+            if not is_groq_healthy:
+                logger.warning("⚠️ Servicio Groq no está healthy")
                 return False
-            
-            # Verificar que el modelo actual funcione
-            if self.current_model_name and self.current_model_name in self.models:
-                return True
-            
-            return False
-            
+
+            logger.info("✅ Servicio de transcripción healthy")
+            return True
+
         except Exception as e:
             logger.error(f"❌ Health check falló: {e}")
             return False
@@ -247,77 +210,26 @@ class TranscriptionService:
         progress_callback: Optional[Callable] = None
     ) -> TranscriptionResponse:
         """
-        Transcribir audio con callbacks de progreso
+        Transcribir audio con callbacks de progreso usando Groq Cloud
         """
         try:
-            start_time = time.time()
-
-            # Callback de progreso inicial
-            if progress_callback:
-                await progress_callback(0.0, "Iniciando transcripción...")
-
-            # Cargar modelo si es necesario
-            model_loaded = await self.load_model(request.model)
-            if not model_loaded:
-                raise Exception(f"No se pudo cargar el modelo: {request.model}")
-
-            if progress_callback:
-                await progress_callback(10.0, "Modelo cargado")
-
-            # Obtener modelo
-            model = self.models[request.model]
-
-            if progress_callback:
-                await progress_callback(20.0, "Procesando audio...")
-
-            # Obtener información del audio
-            audio_info = await self._get_audio_info(request.audio_file_path)
-
-            if progress_callback:
-                await progress_callback(30.0, "Información de audio obtenida")
-
-            # Transcribir con progreso
-            transcription_result = await self._transcribe_faster_whisper_with_progress(
-                model, request, progress_callback
+            # Usar Groq Cloud API con progreso
+            response = await groq_transcription_service.transcribe_with_progress(
+                request, progress_callback
             )
 
-            if progress_callback:
-                await progress_callback(90.0, "Finalizando transcripción...")
-
-            processing_time = time.time() - start_time
-
-            # Crear respuesta
-            response = TranscriptionResponse(
-                text=transcription_result["text"],
-                language=transcription_result["language"],
-                model_used=request.model,
-                segments=transcription_result["segments"],
-                audio_info=audio_info,
-                processing_time=processing_time,
-                config={
-                    "model": request.model,
-                    "language": request.language or "auto",
-                    "return_timestamps": request.return_timestamps,
-                    "temperature": request.temperature,
-                    "initial_prompt": request.initial_prompt
-                }
-            )
-
-            if progress_callback:
-                await progress_callback(100.0, "Transcripción completada")
-
-            logger.info(f"✅ Transcripción con progreso completada en {processing_time:.2f}s")
+            logger.info(f"✅ Transcripción con progreso completada en {response.processing_time:.2f}s")
             return response
 
         except Exception as e:
             if progress_callback:
-                await progress_callback(0.0, f"Error: {str(e)}")
+                await progress_callback(-1.0, f"Error: {str(e)}")
             logger.error(f"❌ Error en transcripción con progreso: {e}")
             raise Exception(f"Error en transcripción: {str(e)}")
 
     async def _transcribe_faster_whisper_with_progress(
         self,
-        model: WhisperModel,
+        model: Any,
         request: TranscriptionRequest,
         progress_callback: Optional[Callable] = None
     ) -> Dict[str, Any]:
