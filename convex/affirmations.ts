@@ -190,6 +190,33 @@ export const createAffirmationSet = action({
   },
 });
 
+export const deleteAffirmationSet = mutation({
+  args: { setId: v.id("affirmationSets") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    // Get the set and verify ownership
+    const set = await ctx.db.get(args.setId);
+    if (!set || set.userId !== userId) {
+      throw new Error("Set not found or unauthorized");
+    }
+
+    // Delete all associated affirmations first
+    const affirmations = await ctx.db
+      .query("affirmations")
+      .withIndex("by_set", (q) => q.eq("setId", args.setId))
+      .collect();
+    
+    for (const affirmation of affirmations) {
+      await ctx.db.delete(affirmation._id);
+    }
+    
+    // Delete the set
+    await ctx.db.delete(args.setId);
+  },
+});
+
 export const generateAntiAffirmations = action({
   args: {
     originalAffirmations: v.array(v.object({

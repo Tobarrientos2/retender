@@ -1,4 +1,7 @@
 import { Id } from "../../convex/_generated/dataModel";
+import { useMutation } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { useState } from "react";
 
 interface AffirmationSet {
   _id: Id<"affirmationSets">;
@@ -33,9 +36,21 @@ export function AffirmationSetList({ sets, onReviewSet }: AffirmationSetListProp
 }
 
 function AffirmationSetCard({ set, onReview }: { set: AffirmationSet; onReview: () => void }) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const deleteSet = useMutation(api.affirmations.deleteAffirmationSet);
+  
   // Determinar el timestamp a usar (createdAt tiene prioridad sobre _creationTime)
   const timestamp = set.createdAt || set._creationTime;
   const isFromAudio = set.metadata?.source === 'audio_transcription' || set.metadata?.source === 'transcription';
+
+  const handleDelete = async () => {
+    try {
+      await deleteSet({ setId: set._id });
+      setShowDeleteConfirm(false);
+    } catch (error) {
+      console.error('Error deleting set:', error);
+    }
+  };
 
   // Formatear fecha y hora
   const formatDateTime = (timestamp: number) => {
@@ -107,14 +122,52 @@ function AffirmationSetCard({ set, onReview }: { set: AffirmationSet; onReview: 
               🎤 Audio
             </span>
           )}
-          <button
-            onClick={onReview}
-            className="px-4 py-2 bg-black text-white text-sm rounded-lg hover:bg-gray-800 transition-colors"
-          >
-            Review
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+              title="Eliminar set"
+            >
+              🗑️
+            </button>
+            <button
+              onClick={onReview}
+              className="px-4 py-2 bg-black text-white text-sm rounded-lg hover:bg-gray-800 transition-colors"
+            >
+              Review
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Modal de confirmación */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              ¿Eliminar set de afirmaciones?
+            </h3>
+            <p className="text-gray-600 mb-4">
+              Esta acción eliminará permanentemente "{set.title}" y todas sus afirmaciones. 
+              No se puede deshacer.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDelete}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
