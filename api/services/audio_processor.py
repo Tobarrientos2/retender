@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Optional
 
 import ffmpeg
-from pydub import AudioSegment
 from loguru import logger
 
 
@@ -117,37 +116,11 @@ class AudioProcessor:
             )
             
         except Exception as e:
-            # Verificar si es un error específico de FFmpeg
-            if 'ffmpeg' in str(e).lower() or 'av' in str(e).lower():
-                logger.error(f"❌ Error FFmpeg: {e}")
-                # Fallback a pydub si FFmpeg falla
-                await self._process_with_pydub(input_path, output_path)
-            else:
-                logger.error(f"❌ Error procesando con FFmpeg: {e}")
-                raise
+            logger.error(f"❌ Error procesando con FFmpeg: {e}")
+            logger.error("💡 Verifica que FFmpeg esté instalado y el archivo de audio sea válido")
+            raise RuntimeError(f"Error procesando audio con FFmpeg: {e}") from e
     
-    async def _process_with_pydub(self, input_path: str, output_path: str):
-        """Procesar audio usando pydub (fallback)"""
-        try:
-            logger.info("🔄 Usando pydub como fallback")
-            
-            # Cargar audio con pydub
-            audio = AudioSegment.from_file(input_path)
-            
-            # Convertir a mono
-            if audio.channels > 1:
-                audio = audio.set_channels(1)
-            
-            # Cambiar sample rate
-            if audio.frame_rate != self.target_sample_rate:
-                audio = audio.set_frame_rate(self.target_sample_rate)
-            
-            # Exportar como WAV
-            audio.export(output_path, format="wav")
-            
-        except Exception as e:
-            logger.error(f"❌ Error procesando con pydub: {e}")
-            raise
+
     
     async def extract_audio_from_video(self, video_path: str) -> str:
         """

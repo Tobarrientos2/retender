@@ -239,7 +239,7 @@
             connectWebSocket(url) {
                 try {
                     // Ajustar URL para puerto correcto
-                    const wsUrl = url.replace('localhost:9000', 'localhost:9001');
+                    const wsUrl = url.replace('localhost:9000', 'localhost:8000');
                     this.websocket = new WebSocket(wsUrl);
                     
                     this.updateConnectionStatus('connecting', 'Conectando...');

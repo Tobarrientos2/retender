@@ -99,16 +99,16 @@ class GroqTranscriptionService:
         Returns:
             TranscriptionResponse: Respuesta con la transcripción
         """
-        logger.info(f"🎤 Iniciando transcripción con Groq Cloud - Archivo: {request.file_path}")
+        logger.info(f"🎤 Iniciando transcripción con Groq Cloud - Archivo: {request.audio_file_path}")
         start_time = time.time()
-        
+
         try:
             # Verificar que el archivo existe
-            if not os.path.exists(request.file_path):
-                raise FileNotFoundError(f"Archivo no encontrado: {request.file_path}")
-            
+            if not os.path.exists(request.audio_file_path):
+                raise FileNotFoundError(f"Archivo no encontrado: {request.audio_file_path}")
+
             # Abrir archivo de audio
-            with open(request.file_path, "rb") as audio_file:
+            with open(request.audio_file_path, "rb") as audio_file:
                 logger.info("📤 Enviando audio a Groq Cloud...")
                 
                 # Llamada a Groq API
@@ -127,28 +127,47 @@ class GroqTranscriptionService:
             if request.return_timestamps and hasattr(transcription, 'segments'):
                 # Con timestamps
                 segments = []
-                for segment in transcription.segments:
+                for i, segment in enumerate(transcription.segments):
+                    # Manejar tanto objetos como diccionarios
+                    if isinstance(segment, dict):
+                        start = segment.get('start', 0.0)
+                        end = segment.get('end', 0.0)
+                        text = segment.get('text', '').strip()
+                    else:
+                        start = getattr(segment, 'start', 0.0)
+                        end = getattr(segment, 'end', 0.0)
+                        text = getattr(segment, 'text', '').strip()
+
                     segments.append(TranscriptionSegment(
-                        start=segment.start,
-                        end=segment.end,
-                        text=segment.text.strip()
+                        id=i,
+                        start=start,
+                        end=end,
+                        text=text
                     ))
                 
+                # Obtener información del audio
+                audio_info = await self.get_audio_info(request.audio_file_path)
+
                 return TranscriptionResponse(
                     text=transcription.text.strip(),
                     segments=segments,
                     language=getattr(transcription, 'language', request.language),
                     processing_time=processing_time,
-                    model_used="whisper-large-v3-turbo-groq"
+                    model_used="whisper-large-v3-turbo-groq",
+                    audio_info=audio_info
                 )
             else:
                 # Solo texto
+                # Obtener información del audio
+                audio_info = await self.get_audio_info(request.audio_file_path)
+
                 return TranscriptionResponse(
                     text=transcription.text.strip(),
                     segments=None,
                     language=getattr(transcription, 'language', request.language),
                     processing_time=processing_time,
-                    model_used="whisper-large-v3-turbo-groq"
+                    model_used="whisper-large-v3-turbo-groq",
+                    audio_info=audio_info
                 )
                 
         except Exception as e:
@@ -179,8 +198,8 @@ class GroqTranscriptionService:
                 await progress_callback(20.0, "Preparando archivo de audio...")
             
             # Verificar archivo
-            if not os.path.exists(request.file_path):
-                raise FileNotFoundError(f"Archivo no encontrado: {request.file_path}")
+            if not os.path.exists(request.audio_file_path):
+                raise FileNotFoundError(f"Archivo no encontrado: {request.audio_file_path}")
             
             if progress_callback:
                 await progress_callback(40.0, "Enviando a Groq Cloud...")
@@ -219,21 +238,34 @@ class GroqTranscriptionService:
             duration = float(audio_stream.get('duration', 0))
             sample_rate = int(audio_stream.get('sample_rate', 0))
             channels = int(audio_stream.get('channels', 0))
-            
+
+            # Calcular tamaño del archivo en MB
+            file_size_bytes = os.path.getsize(file_path)
+            size_mb = file_size_bytes / (1024 * 1024)
+
             return AudioInfo(
                 duration=duration,
                 sample_rate=sample_rate,
                 channels=channels,
-                format=audio_stream.get('codec_name', 'unknown')
+                format=audio_stream.get('codec_name', 'unknown'),
+                size_mb=size_mb
             )
             
         except Exception as e:
             logger.warning(f"⚠️ No se pudo obtener info del audio: {e}")
+            # Calcular tamaño del archivo como fallback
+            try:
+                file_size_bytes = os.path.getsize(file_path)
+                size_mb = file_size_bytes / (1024 * 1024)
+            except:
+                size_mb = 0.0
+
             return AudioInfo(
                 duration=0.0,
                 sample_rate=16000,
                 channels=1,
-                format="unknown"
+                format="unknown",
+                size_mb=size_mb
             )
     
     def get_available_models(self) -> list:

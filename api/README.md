@@ -10,7 +10,7 @@ API REST moderna para transcripción de audio usando OpenAI Whisper, construida 
 - **🌍 Multiidioma**: Detección automática o manual
 - **⏱️ Timestamps**: Segmentación temporal opcional
 - **📊 Información detallada**: Metadatos de audio y procesamiento
-- **🔧 Procesamiento robusto**: FFmpeg + fallback a pydub
+- **🔧 Procesamiento robusto**: FFmpeg para conversión de audio
 - **📝 Documentación automática**: Swagger UI integrado
 
 ## 📋 Requisitos

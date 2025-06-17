@@ -86,7 +86,7 @@ class TranscriptionService:
         Returns:
             TranscriptionResponse: Resultado de la transcripción
         """
-        logger.info(f"🎤 Iniciando transcripción con Groq Cloud - Archivo: {Path(request.file_path).name}")
+        logger.info(f"🎤 Iniciando transcripción con Groq Cloud - Archivo: {Path(request.audio_file_path).name}")
 
         try:
             # Usar Groq Cloud API para transcripción

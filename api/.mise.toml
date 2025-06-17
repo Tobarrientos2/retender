@@ -5,12 +5,8 @@ python = "3.10"
 # Variables de entorno para la API
 PYTHONPATH = "."
 UV_HTTP_TIMEOUT = "600"
-
-# Configuración para usar modelo local únicamente
-USE_OPENAI_API = "false"
-MODEL_SIZE = "medium"
-DEVICE = "cpu"
-COMPUTE_TYPE = "int8"
+# Cargar variables de entorno desde .env
+_.file = ".env"
 
 [tasks.install]
 description = "Instalar dependencias usando pip"

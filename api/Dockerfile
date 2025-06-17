@@ -22,6 +22,7 @@ FROM python:3.11-slim AS runtime
 # Instalar solo dependencias runtime esenciales
 RUN apt-get update && apt-get install -y \
     ffmpeg \
+    curl \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -52,9 +53,9 @@ ENV PORT=8000
 # Exponer puerto
 EXPOSE 8000
 
-# Health check ligero
+# Health check ligero usando curl (más eficiente)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/health', timeout=5)" || exit 1
+    CMD curl -f http://localhost:8000/health || exit 1
 
 # Comando optimizado para WebSocket + API
 CMD ["python", "start_with_websocket.py", "--port", "8000", "--host", "0.0.0.0"]

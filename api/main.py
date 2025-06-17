@@ -396,16 +396,15 @@ async def submit_transcription_job(
         )
 
         # Crear URL del WebSocket dinámicamente
-        host = os.getenv("HOST", "localhost")
-        port = os.getenv("PORT", "9001")
-
-        # En producción, usar WSS y dominio de Koyeb
+        # En desarrollo, usar localhost independientemente de HOST
         if os.getenv("ENVIRONMENT") == "production":
             # Koyeb proporciona HTTPS/WSS automáticamente
+            host = os.getenv("HOST", "localhost")
             websocket_url = f"wss://{host}/ws/transcription/{job_id}"
         else:
-            # Desarrollo local
-            websocket_url = f"ws://{host}:{port}/ws/transcription/{job_id}"
+            # Desarrollo local - siempre usar localhost
+            port = os.getenv("PORT", "8000")
+            websocket_url = f"ws://localhost:{port}/ws/transcription/{job_id}"
 
         # Estimar tiempo de procesamiento (aproximado)
         estimated_time = file_size / (1024 * 1024) * 30  # ~30 segundos por MB
