@@ -166,14 +166,13 @@ async def debug_status():
 
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
-    """Health check endpoint - TEMPORAL: siempre healthy para debugging"""
-    logger.info("🔍 Health check - TEMPORAL: retornando healthy para debugging")
+    """Health check endpoint - Retorna JSON válido con status 200"""
+    logger.info("🔍 Health check - Retornando JSON válido para Koyeb")
 
-    # TEMPORAL: Siempre retornar healthy para que el deployment funcione
-    # y podamos debuggear el problema real
+    # Retornar JSON válido con status code 200 (2xx) que Koyeb requiere
     return HealthResponse(
         status="healthy",
-        message="Servicio healthy (temporal para debugging)",
+        message="Servicio funcionando correctamente",
         version="1.0.0"
     )
 
