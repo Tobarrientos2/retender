@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useState } from "react";
+import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { CreateSet } from "./CreateSet";
@@ -13,19 +13,7 @@ import { RecordScreen } from "./RecordScreen";
 import { RecordingSettings } from "./RecordingSettings";
 import { BackgroundTranscriber } from "./BackgroundTranscriber";
 import { BackgroundTranscriptionNotifier, TranscriptionStatusPanel } from "./BackgroundTranscriptionNotifier";
-import { CleanupOrphanedJobs } from "./CleanupOrphanedJobs";
 
-interface SessionData {
-  sessionId: number;
-  theme: string;
-  affirmations: Array<{
-    content: string;
-    order: number;
-    subject: string;
-    timeframe?: string;
-    category: string;
-  }>;
-}
 
 export function Dashboard() {
   const [currentView, setCurrentView] = useState<
@@ -46,14 +34,7 @@ export function Dashboard() {
 
   const sets = useQuery(api.affirmations.getUserSets) || [];
 
-  const initializeSampleData = useMutation(api.affirmations.initializeSampleData);
-
-  // Initialize sample data on first load
-  useEffect(() => {
-    if (sets.length === 0) {
-      initializeSampleData();
-    }
-  }, [sets.length, initializeSampleData]);
+  // Auto-initialization removed - users must create their own content
 
   if (currentView === "create") {
     return (
@@ -69,7 +50,7 @@ export function Dashboard() {
       <CreateSessions
         onBack={() => setCurrentView("home")}
         onComplete={(collectionId) => {
-          setSelectedCollectionId(collectionId);
+          setSelectedCollectionId(collectionId as Id<"sessionCollections">);
           setCurrentView("sessions-list");
         }}
       />
@@ -154,13 +135,12 @@ export function Dashboard() {
           </button>
         </div>
         <BackgroundTranscriber
-          onTranscriptionComplete={(result) => {
-            console.log('Transcripción completada:', result);
+          onTranscriptionComplete={(_result) => {
             // Aquí podrías integrar con el sistema de afirmaciones
             // Por ejemplo, generar afirmaciones a partir del texto transcrito
           }}
-          onError={(error) => {
-            console.error('Error en transcripción:', error);
+          onError={(_error) => {
+            // Error handling can be implemented here if needed
           }}
         />
       </div>
@@ -169,10 +149,10 @@ export function Dashboard() {
 
   return (
     <div className="space-y-12">
+
       {/* Background Transcription Notifier - Persiste durante toda la sesión */}
       <BackgroundTranscriptionNotifier
-        onTranscriptionComplete={(jobId, result) => {
-          console.log('Transcripción completada en background:', jobId, result);
+        onTranscriptionComplete={(_jobId, _result) => {
           // Aquí podrías navegar automáticamente o mostrar el resultado
         }}
       />
@@ -192,9 +172,6 @@ export function Dashboard() {
 
       {/* Panel de Estado de Transcripciones */}
       <TranscriptionStatusPanel />
-
-      {/* Herramienta temporal de limpieza */}
-      <CleanupOrphanedJobs />
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 max-w-7xl mx-auto">

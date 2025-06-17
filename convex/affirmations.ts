@@ -22,13 +22,114 @@ export const getUserSets = query({
   args: {},
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
+    console.log("getUserSets - userId:", userId);
+    
+    if (!userId) {
+      console.log("getUserSets - No userId found, returning empty array");
+      return [];
+    }
 
-    return await ctx.db
-      .query("affirmationSets")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .order("desc")
-      .collect();
+    try {
+      const sets = await ctx.db
+        .query("affirmationSets")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .order("desc")
+        .collect();
+      
+      console.log("getUserSets - Found sets:", sets.length, "sets for user:", userId);
+      console.log("getUserSets - Sets data:", sets.map(s => ({ id: s._id, title: s.title, userId: s.userId })));
+      
+      return sets;
+    } catch (error) {
+      console.error("getUserSets - Error querying sets:", error);
+      return [];
+    }
+  },
+});
+
+// Debug query to inspect database state
+export const debugDatabaseState = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    console.log("debugDatabaseState - userId:", userId);
+    
+    try {
+      // Get all affirmation sets (without user filter)
+      const allSets = await ctx.db.query("affirmationSets").collect();
+      console.log("debugDatabaseState - Total sets in DB:", allSets.length);
+      
+      // Show a few examples
+      const sampleSets = allSets.slice(0, 5).map(s => ({
+        id: s._id,
+        title: s.title,
+        userId: s.userId,
+        createdAt: s.createdAt
+      }));
+      console.log("debugDatabaseState - Sample sets:", sampleSets);
+      
+      // Get all users to understand the userId values
+      const allUsers = await ctx.db.query("users").collect();
+      console.log("debugDatabaseState - Total users in DB:", allUsers.length);
+      const sampleUsers = allUsers.slice(0, 3).map(u => ({
+        id: u._id,
+        name: u.name,
+        email: u.email
+      }));
+      console.log("debugDatabaseState - Sample users:", sampleUsers);
+      
+      // If we have a userId, check for matches
+      if (userId) {
+        const userSets = allSets.filter(s => s.userId === userId);
+        console.log("debugDatabaseState - User sets found:", userSets.length);
+        console.log("debugDatabaseState - User sets data:", userSets.map(s => ({ id: s._id, title: s.title })));
+        
+        // Check if the userId exists in the users table
+        const user = await ctx.db.get(userId);
+        console.log("debugDatabaseState - Current user data:", user ? { id: user._id, name: user.name, email: user.email } : "User not found");
+      }
+      
+      return {
+        userId,
+        totalSets: allSets.length,
+        totalUsers: allUsers.length,
+        userSets: userId ? allSets.filter(s => s.userId === userId).length : 0,
+        sampleSets,
+        sampleUsers
+      };
+    } catch (error) {
+      console.error("debugDatabaseState - Error:", error);
+      return { error: error instanceof Error ? error.message : String(error) };
+    }
+  },
+});
+
+// Alternative query without authentication to check raw data
+export const debugRawDatabaseState = query({
+  args: {},
+  handler: async (ctx) => {
+    try {
+      const allSets = await ctx.db.query("affirmationSets").collect();
+      const allUsers = await ctx.db.query("users").collect();
+      
+      return {
+        totalSets: allSets.length,
+        totalUsers: allUsers.length,
+        rawSets: allSets.map(s => ({
+          id: s._id,
+          title: s.title,
+          userId: s.userId,
+          createdAt: s.createdAt
+        })),
+        rawUsers: allUsers.map(u => ({
+          id: u._id,
+          name: u.name,
+          email: u.email
+        }))
+      };
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    }
   },
 });
 
@@ -218,8 +319,10 @@ export const analyzeImage = action({
 
 export const initializeSampleData = mutation({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx): Promise<any> => {
     const userId = await getAuthUserId(ctx);
+    console.log("initializeSampleData - userId:", userId);
+    
     if (!userId) throw new Error("Not authenticated");
 
     // Check if user already has data
@@ -228,9 +331,67 @@ export const initializeSampleData = mutation({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
 
+    console.log("initializeSampleData - Existing sets:", existingSets.length);
+
     if (existingSets.length === 0) {
-      await ctx.runMutation(internal.sampleData.createSampleData, { userId });
+      console.log("initializeSampleData - Creating sample data for user:", userId);
+      const result: any = await ctx.runMutation(internal.sampleData.createSampleData, { userId });
+      console.log("initializeSampleData - Sample data created:", result);
+      return result;
+    } else {
+      console.log("initializeSampleData - User already has data, skipping creation");
+      return { skipped: true, existingCount: existingSets.length };
     }
+  },
+});
+
+export const clearSampleData = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    console.log("clearSampleData - userId:", userId);
+    
+    if (!userId) throw new Error("Not authenticated");
+
+    // Get all user's affirmation sets
+    const userSets = await ctx.db
+      .query("affirmationSets")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    console.log("clearSampleData - Found user sets:", userSets.length);
+    console.log("clearSampleData - User sets:", userSets.map(s => ({ id: s._id, title: s.title })));
+
+    // Delete sample data sets (those with hardcoded titles)
+    const sampleTitles = ["World War II Timeline", "Quantum Physics Basics", "Calculus Fundamentals"];
+    let deletedSets = 0;
+    let deletedAffirmations = 0;
+    
+    for (const set of userSets) {
+      if (sampleTitles.includes(set.title)) {
+        console.log("clearSampleData - Deleting sample set:", set.title, set._id);
+        
+        // Delete associated affirmations first
+        const affirmations = await ctx.db
+          .query("affirmations")
+          .withIndex("by_set", (q) => q.eq("setId", set._id))
+          .collect();
+        
+        console.log("clearSampleData - Found affirmations for set:", affirmations.length);
+        
+        for (const affirmation of affirmations) {
+          await ctx.db.delete(affirmation._id);
+          deletedAffirmations++;
+        }
+        
+        // Delete the set
+        await ctx.db.delete(set._id);
+        deletedSets++;
+      }
+    }
+    
+    console.log("clearSampleData - Deleted", deletedSets, "sets and", deletedAffirmations, "affirmations");
+    return { deletedSets, deletedAffirmations };
   },
 });
 

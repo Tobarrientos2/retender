@@ -423,7 +423,7 @@ export const generateAntiAffirmations = internalAction({
       .join('\n');
 
     // Retry logic optimizado para evitar timeouts largos
-    const maxRetries = 2; // Reducir reintentos
+    const maxRetries = 4; // Aumentar reintentos para evitar errores de analogías
     let lastError = null;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -444,13 +444,14 @@ ${affirmationsText}
 🎯 MISIÓN CRÍTICA: Crear exactamente 3 paráfrasis INCORRECTAS con ERRORES CONCEPTUALES evidentes que simulen malentendidos de estudiantes. NUNCA generes paráfrasis correctas.
 
 📋 REGLAS OBLIGATORIAS (CUMPLIR AL 100%):
-1. ❌ CADA paráfrasis DEBE contener ERRORES CONCEPTUALES + vocabulario impreciso
-2. ❌ INCLUIR información INCORRECTA (fechas erróneas, datos falsos, conceptos confundidos)
-3. ❌ NUNCA uses el vocabulario técnico correcto del original
-4. ❌ CAMBIAR hechos importantes para crear errores evidentes
-5. ❌ PROHIBIDO usar analogías, comparaciones o metáforas ("como si", "parecido a", "igual que")
-6. ✅ Combinar vocabulario impreciso CON errores factuales
-7. ❌ Si la paráfrasis es factualmente correcta, FALLAS completamente en tu tarea
+1. 🎯 MANTENER LOS SUJETOS PRINCIPALES: Identificar nombres, personas, lugares, eventos principales y NO cambiarlos
+2. ❌ CADA paráfrasis DEBE contener ERRORES CONCEPTUALES + vocabulario impreciso
+3. ❌ INCLUIR información INCORRECTA (fechas erróneas, datos falsos, conceptos confundidos)
+4. ❌ NUNCA uses el vocabulario técnico correcto del original
+5. ❌ Solo modificar datos secundarios: fechas, números, conceptos técnicos, descripciones
+6. ❌ PROHIBIDO usar analogías, comparaciones o metáforas ("como si", "parecido a", "igual que", "como la", "como el", "como los", "como las")
+7. ✅ Combinar vocabulario impreciso CON errores factuales MANTENIENDO el tema central
+8. ❌ Si cambias el sujeto principal o tema central, FALLAS completamente en tu tarea
 
 TRANSFORMACIONES OBLIGATORIAS (EJEMPLOS ESPECÍFICOS):
 **Programación:**

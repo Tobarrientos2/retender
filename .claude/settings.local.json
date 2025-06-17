@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "Bash(npm run dev:*)",
-      "Bash(npx convex dev:*)"
+      "Bash(npx convex dev:*)",
+      "Bash(npx convex run:*)",
+      "Bash(find:*)",
+      "Bash(pkill:*)",
+      "Bash(rg:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(grep:*)"
     ],
     "deny": []
   }

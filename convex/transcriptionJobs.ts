@@ -253,15 +253,15 @@ export const updateTranscriptionJobFromAPI = internalMutation({
 export const cleanupOrphanedJobs = mutation({
   args: {},
   handler: async (ctx) => {
-    // Buscar jobs que están en pending por más de 1 hora (probablemente huérfanos)
-    const oneHourAgo = Date.now() - (60 * 60 * 1000);
+    // Buscar jobs que están en pending por más de 5 minutos (probablemente huérfanos)
+    const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
 
     const orphanedJobs = await ctx.db
       .query("transcriptionJobs")
       .filter((q) =>
         q.and(
           q.eq(q.field("status"), "pending"),
-          q.lt(q.field("createdAt"), oneHourAgo)
+          q.lt(q.field("createdAt"), fiveMinutesAgo)
         )
       )
       .collect();

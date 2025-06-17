@@ -300,9 +300,16 @@ class JobQueueService:
                 result_data = {
                     "text": job.result.text,
                     "language": job.result.language,
-                    "duration": job.result.duration,
-                    "segments": job.result.segments if hasattr(job.result, 'segments') else None,
-                    "processing_time": job.result.processing_time if hasattr(job.result, 'processing_time') else None
+                    "model_used": job.result.model_used,
+                    "processing_time": job.result.processing_time,
+                    "segments": job.result.segments if job.result.segments else None,
+                    "audio_info": {
+                        "duration": job.result.audio_info.duration,
+                        "sample_rate": job.result.audio_info.sample_rate,
+                        "channels": job.result.audio_info.channels,
+                        "format": job.result.audio_info.format,
+                        "size_mb": job.result.audio_info.size_mb
+                    } if job.result.audio_info else None
                 }
 
             # Sincronizar con Convex

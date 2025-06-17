@@ -22,6 +22,7 @@ interface AffirmationSetListProps {
 }
 
 export function AffirmationSetList({ sets, onReviewSet }: AffirmationSetListProps) {
+
   return (
     <div className="grid gap-4">
       {sets.map((set) => (
